@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 
 /**
@@ -51,6 +51,8 @@ export async function registerAction(
   const ip = h.get("x-forwarded-for") ?? "local";
   if (!rateLimit(`register:${ip}`)) return { error: "rate_limited" };
 
+  if (!isSupabaseConfigured()) return { error: "db_unconfigured" };
+
   const supabase = createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -78,6 +80,8 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
   const ip = h.get("x-forwarded-for") ?? "local";
   if (!rateLimit(`login:${ip}:${email}`)) return { error: "rate_limited" };
 
+  if (!isSupabaseConfigured()) return { error: "db_unconfigured" };
+
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "invalid" };
@@ -100,6 +104,8 @@ export async function forgotPasswordAction(
 
   const h = await headers();
   if (!rateLimit(`forgot:${h.get("x-forwarded-for") ?? "local"}`)) return { error: "rate_limited" };
+
+  if (!isSupabaseConfigured()) return { success: "sent" }; // no-enumeration posture preserved when unconfigured
 
   const supabase = createClient();
   const origin = h.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "";

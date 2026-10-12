@@ -10,6 +10,7 @@ const ERRORS: Record<string, string> = {
   missing: "Please fill in all fields.",
   invalid: "Incorrect email or password.",
   rate_limited: "Too many attempts — wait a minute and try again.",
+  db_unconfigured: "Account services are temporarily unavailable. Please try again later.",
 };
 
 export default function LoginForm() {

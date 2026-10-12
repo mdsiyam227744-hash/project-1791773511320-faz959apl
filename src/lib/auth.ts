@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { STAFF_ROLE_LABELS, ROLE_GRANT_MATRIX, type UserRole } from "./auth-types";
 
 export { STAFF_ROLE_LABELS, ROLE_GRANT_MATRIX };
@@ -13,6 +13,11 @@ export interface StaffRecord {
 }
 
 export async function getSessionUser() {
+  // When the platform has no connected database, fail closed with null instead of
+  // throwing — every caller (guards, API routes, staffish) already treats null as
+  // "not signed in", so authenticated surfaces degrade to the public site plus a
+  // login form instead of crashing.
+  if (!isSupabaseConfigured()) return null;
   const supabase = createClient();
   const {
     data: { user },

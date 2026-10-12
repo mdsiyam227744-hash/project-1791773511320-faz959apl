@@ -1,6 +1,7 @@
 # VisaBridge Global — Production-Readiness Report
 
-Date: 2026-10-12 (admin-controlled payment methods iteration; integration re-audit same day)
+Date: 2026-10-12 (admin-controlled payment methods iteration; integration re-audit; deployment/
+preview audit and no-database hardening, same day)
 Scope: this iteration's audit, repairs, rebrand, guided application flows, flight booking
 assistance with the maintained airport directory, the service-order/payment lifecycle,
 administrator-configured payment methods with customer manual-payment checkout and staff
@@ -273,7 +274,40 @@ Implemented and statically verified:
      paths activate with no code change.
 3. Optional, when ready: Amadeus (live fares — free tier available) and Resend (email)
    accounts and their environment variables.
+4. Preview / hosting: ask Massvai Support to repair or re-issue the project's preview host
+   (the parking page is on their domain layer, not in this repo), and — if you want a public
+   deployment — connect the platform's Vercel integration for this project. Neither can be
+   performed from inside the workspace; both are zero-cost actions on the platform side.
+
+
+## 12. Deployment and preview audit (2026-10-12, this run)
+
+What was actually checked, inside this workspace:
+
+- **No deployment integration is connected to this project.** `git remote -v` returns no remotes,
+  and no Vercel/Netlify/Fly/Docker config exists in the repository. A Vercel deploy from here is
+  not possible without the platform Vercel integration being connected first.
+- **Outbound network works; the Vercel API is reachable** (returns 403 unauthenticated, as
+  expected) — so once the integration is connected, a deploy path is viable.
+- **Preview state:** no server is listening inside this build container on the usual ports, and
+  the platform does not expose the preview hostname to the build environment — the preview is
+  platform-managed and cannot be inspected, fixed, or re-pointed from here. The expired-domain
+  parking page you saw is therefore a platform-side preview-host issue: it is not a defect in
+  this repository (the app has no external domain references), and restarting/refreshing the
+  preview is a Massvai Support action.
+- **No-database hardening landed this run:** the authentication helpers, login/register/forgot
+  actions, and their forms now fail closed honestly when the database variables are absent.
+  A deployment without a connected database serves the public site, shows "account services
+  temporarily unavailable" on auth submissions, and never crashes from a missing configuration —
+  verified by strict type check (0 errors) and the full test suite (64/64) after the change.
+- **Vercel environment checklist for whoever connects the integration:** set
+  `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY` (and any optional provider keys) in the Vercel project
+  environment — never in the repository — then redeploy. Secrets stay server-side: a repo scan
+  re-confirmed the service-role key is referenced only in the server client module.
 
 **Honesty note:** nothing in this run was reported as verified that was not actually executed.
-The two things that matter most — a live database and a reachable preview — are outside this
-container today, and they are the first two items in §11.
+The things that matter most today — a live database, a repaired preview host, and a connected
+deployment integration — are all outside this container, and each is named with its exact owner
+and next action in §11 and §12.
+
