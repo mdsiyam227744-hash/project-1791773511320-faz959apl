@@ -9,15 +9,31 @@ export default async function AdminJobs() {
   const supabase = createClient();
   const [countries] = await Promise.all([listCountries()]);
 
-  const { data: employers } = await supabase
+  const { data: employerRows } = await supabase
     .from("employers")
     .select("id, name, workplace, verification_status, country:countries(name_en)")
     .order("created_at", { ascending: false });
+  const employers = (employerRows ?? []) as unknown as {
+    id: string;
+    name: string;
+    workplace: string | null;
+    verification_status: string;
+    country: { name_en: string | null } | null;
+  }[];
 
-  const { data: jobs } = await supabase
+  const { data: jobRows } = await supabase
     .from("job_listings")
     .select("id, title_en, status, application_deadline, salary_amount, salary_currency, employer:employers(name)")
     .order("created_at", { ascending: false });
+  const jobs = (jobRows ?? []) as unknown as {
+    id: string;
+    title_en: string;
+    status: string;
+    application_deadline: string | null;
+    salary_amount: number | null;
+    salary_currency: string | null;
+    employer: { name: string } | null;
+  }[];
 
   return (
     <div>

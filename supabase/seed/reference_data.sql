@@ -73,9 +73,10 @@ on conflict (iso2) do update set name_en = excluded.name_en, name_bn = excluded.
 -- ---------------------------------------------------------------------------
 -- Default brand + contact settings
 -- ---------------------------------------------------------------------------
-insert into public.brand_settings (id, business_name, primary_color, secondary_color, default_locale)
-values (1,'Visa & Travel Services','#0A1F44','#C9A227','en')
-on conflict (id) do nothing;
+insert into public.brand_settings (id, business_name, tagline_en, tagline_bn, primary_color, secondary_color, default_locale)
+values (1,'VisaBridge Global','Your Journey. Our Guidance.','আপনার যাত্রা। আমাদের পথনির্দেশনা।','#0A1F44','#C9A227','en')
+on conflict (id) do update set business_name = excluded.business_name,
+  tagline_en = excluded.tagline_en, tagline_bn = excluded.tagline_bn;
 
 insert into public.contact_settings (id, whatsapp_number, whatsapp_default_message, imo_contact, imo_mode,
                                      whatsapp_button_label, imo_button_label)

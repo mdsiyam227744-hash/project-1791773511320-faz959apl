@@ -4,11 +4,20 @@ import { createClient } from "@/lib/supabase/server";
 export default async function AdminAudit() {
   await requireStaff(["super_admin", "application_manager"]);
   const supabase = createClient();
-  const { data: logs } = await supabase
+  const { data } = await supabase
     .from("audit_logs")
     .select("id, action, entity, entity_id, details, created_at, staff:staff(display_name)")
     .order("created_at", { ascending: false })
     .limit(100);
+  const logs = (data ?? []) as unknown as {
+    id: number;
+    action: string;
+    entity: string | null;
+    entity_id: string | null;
+    details: Record<string, unknown> | null;
+    created_at: string;
+    staff: { display_name: string | null } | null;
+  }[];
 
   return (
     <div>

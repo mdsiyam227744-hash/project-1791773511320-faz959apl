@@ -177,4 +177,4 @@ export function mapOffer(offer: unknown): FlightQuote {
 
 // Distance and offer-mapping helpers live in the pure, dependency-free geo module
 // (shared with the unit tests).
-export { haversineKm, mapOffer } from "./geo";
+export { haversineKm } from "./geo";

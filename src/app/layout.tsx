@@ -9,14 +9,20 @@ export async function generateMetadata(): Promise<Metadata> {
   const brand = await getBrand();
   return {
     title: {
-      default: `${brand.businessName} — Visa, Immigration & Travel Assistance`,
+      default: `${brand.businessName} — ${brand.tagline.en}`,
       template: `%s · ${brand.businessName}`,
     },
     description:
       "Verified visa information, honest cost estimates, and guided application assistance for travel, study, work, and business worldwide.",
     icons: brand.faviconSvg
       ? { icon: `data:image/svg+xml,${encodeURIComponent(brand.faviconSvg)}` }
-      : undefined,
+      : {
+          icon: [
+            { url: "/brand/favicon.svg", type: "image/svg+xml" },
+            { url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" },
+          ],
+          apple: "/brand/icon-192.png",
+        },
   };
 }
 

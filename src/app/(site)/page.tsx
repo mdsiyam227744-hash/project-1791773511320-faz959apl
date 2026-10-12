@@ -26,7 +26,7 @@ export default async function HomePage() {
       <section className="bg-[var(--brand-primary)] text-white">
         <div className="mx-auto max-w-6xl px-4 py-16 md:py-24">
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[var(--brand-secondary)]">
-            {brand.businessName}
+            {brand.businessName} — {brand.tagline[locale]}
           </p>
           <h1 className="max-w-3xl text-3xl font-bold leading-tight md:text-5xl">
             {t(locale, "hero.title")}
@@ -48,7 +48,7 @@ export default async function HomePage() {
               {t(locale, "cta.findDestination")}
             </Link>
             <Link
-              href="/apply"
+              href="/apply/guided"
               className="rounded-md border border-navy-300 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
             >
               {t(locale, "cta.apply")}

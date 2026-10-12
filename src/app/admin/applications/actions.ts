@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireStaff } from "@/lib/auth";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { canTransition } from "./shared";
 
 const schema = z.object({
   application_id: z.string().uuid(),
@@ -13,9 +14,12 @@ const schema = z.object({
 });
 
 /**
- * Staff update of an application. RLS permits staff writes; we still verify the
- * actor is active staff server-side before touching the row, and the status
- * history trigger records the change with the acting user.
+ * Staff update of an application. Authorization is layered:
+ *  1. requireStaff() — active staff only (application layer).
+ *  2. RLS policies — staff-scoped writes (database layer).
+ *  3. Transition map — valid workflow moves only (application layer), with the
+ *     decided-state guard duplicated by the DB trigger.
+ * The status-history trigger records who changed what, and when.
  */
 export async function updateApplication(formData: FormData) {
   const { staff } = await requireStaff();
@@ -28,6 +32,17 @@ export async function updateApplication(formData: FormData) {
   if (!parsed.success) return;
 
   const supabase = createClient();
+
+  const { data: current } = await supabase
+    .from("applications")
+    .select("status")
+    .eq("id", parsed.data.application_id)
+    .maybeSingle();
+  if (!current) return;
+  if (current.status !== parsed.data.status && !canTransition(current.status, parsed.data.status)) {
+    return; // invalid transition; ignore (UI only offers valid ones)
+  }
+
   await supabase
     .from("applications")
     .update({

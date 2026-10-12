@@ -7,6 +7,7 @@ import type { Locale } from "./i18n";
 
 export interface Brand {
   businessName: string;
+  tagline: { en: string; bn: string };
   logoSvg: string | null;
   faviconSvg: string | null;
   primaryColor: string;
@@ -15,7 +16,8 @@ export interface Brand {
 }
 
 const FALLBACK_BRAND: Brand = {
-  businessName: "Visa & Travel Services",
+  businessName: "VisaBridge Global",
+  tagline: { en: "Your Journey. Our Guidance.", bn: "আপনার যাত্রা। আমাদের পথনির্দেশনা।" },
   logoSvg: null,
   faviconSvg: null,
   primaryColor: "#0A1F44",
@@ -53,6 +55,10 @@ export async function getBrand(): Promise<Brand> {
     if (!data) return FALLBACK_BRAND;
     return {
       businessName: data.business_name ?? FALLBACK_BRAND.businessName,
+      tagline: {
+        en: data.tagline_en ?? FALLBACK_BRAND.tagline.en,
+        bn: data.tagline_bn ?? FALLBACK_BRAND.tagline.bn,
+      },
       logoSvg: data.logo_svg ?? null,
       faviconSvg: data.favicon_svg ?? null,
       primaryColor: data.primary_color ?? FALLBACK_BRAND.primaryColor,

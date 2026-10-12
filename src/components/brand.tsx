@@ -2,19 +2,56 @@ import Link from "next/link";
 import { getContact, buildWhatsAppLink, buildImoLink } from "@/lib/settings";
 import { t, type Locale } from "@/lib/i18n";
 
-export function BrandMark({ name, logoSvg }: { name: string; logoSvg: string | null }) {
+/**
+ * Brand mark. Renders the admin-configured SVG logo when one is stored in the
+ * database; otherwise the bundled VisaBridge Global assets (navy globe with a
+ * white checkmark, gold meridians). The full wordmark SVG already carries the
+ * navy "VisaBridge / GLOBAL" text, so no extra text node is needed.
+ */
+export function BrandMark({
+  name,
+  logoSvg,
+  tagline,
+  variant = "auto",
+}: {
+  name: string;
+  logoSvg: string | null;
+  tagline?: string;
+  variant?: "auto" | "dark";
+}) {
   if (logoSvg) {
     // Admin-provided SVG logo, stored in the database.
-    return <span dangerouslySetInnerHTML={{ __html: logoSvg }} className="inline-block h-8" />;
-  }
-  return (
-    <span className="flex items-center gap-2">
-      <span className="grid h-9 w-9 place-items-center rounded-md bg-[var(--brand-primary)] text-[var(--brand-secondary)] font-bold">
-        {name.trim().charAt(0).toUpperCase() || "V"}
+    return (
+      <span className="inline-flex flex-col">
+        <span dangerouslySetInnerHTML={{ __html: logoSvg }} className="inline-block h-8" />
+        {tagline ? <span className="text-[10px] text-navy-500">{tagline}</span> : null}
       </span>
-      <span className="font-semibold tracking-tight text-[var(--brand-primary)]">{name}</span>
+    );
+  }
+  const src =
+    variant === "dark"
+      ? "/brand/logo-full-dark.svg"
+      : "/brand/logo-full.svg";
+  return (
+    <span className="inline-flex flex-col">
+      {/* eslint-disable-next-line @next/next/no-img-element -- asset is a local, first-party SVG */}
+      <img src={src} alt={name} width={168} height={34} className="h-8 w-auto" />
+      {tagline ? (
+        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-widest text-navy-500">
+          {tagline}
+        </span>
+      ) : null}
     </span>
   );
+}
+
+/** Compact icon-only variant for toolbars, dashboards, and auth screens. */
+export function BrandIcon({ logoSvg }: { logoSvg: string | null }) {
+  if (logoSvg) {
+    return <span dangerouslySetInnerHTML={{ __html: logoSvg }} className="inline-block h-9 w-9" />;
+  }
+  // eslint-disable-next-line @next/next/no-img-element -- local first-party asset
+  return <img src="/brand/logo-icon.svg" alt="" width={36} height={36} className="h-9 w-9 rounded-md" />;
 }
 
 export async function ContactButtons({ locale = "en" as Locale }: { locale?: Locale }) {

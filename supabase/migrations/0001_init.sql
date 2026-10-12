@@ -1,6 +1,8 @@
 -- ============================================================================
 -- 0001_init.sql — extensions, enums, core schema
 -- Idempotent: safe to re-run.
+-- Dollar-quote tags are named ($do$, $fn$) to avoid collisions with the
+-- bodies they wrap.
 -- ============================================================================
 
 create extension if not exists "pgcrypto";
@@ -9,50 +11,43 @@ create extension if not exists "pg_trgm";
 -- ---------------------------------------------------------------------------
 -- Enumerated domain types
 -- ---------------------------------------------------------------------------
-do $$ begin
+do $do$ begin
   create type user_role as enum ('super_admin','application_manager','content_manager','support_agent');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type visa_category_code as enum (
     'tourist','work','student','business','family','transit','medical','residence','other'
   );
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type content_status as enum ('draft','published','archived');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
-  create type app_status as enum (
-    'submitted','under_review','awaiting_documents','awaiting_customer','in_progress',
-    'submitted_to_authority','approved','refused','withdrawn','closed'
-  );
-exception when duplicate_object then null; end $$;
-
-do $$ begin
+do $do$ begin
   create type doc_kind as enum (
     'passport_scan','photo','bank_statement','employment_letter','invitation_letter',
     'admission_letter','police_clearance','medical_certificate','marriage_certificate',
     'birth_certificate','other'
   );
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type fee_kind as enum ('official_government','agency_service','third_party','optional_service');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type job_status as enum ('pending_review','approved','suspended','rejected','archived','closed');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type consult_status as enum ('new','contacted','scheduled','converted','closed');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
-do $$ begin
+do $do$ begin
   create type payment_status as enum ('requires_confirmation','confirmed','failed','refunded','partially_refunded');
-exception when duplicate_object then null; end $$;
+exception when duplicate_object then null; end $do$;
 
 -- ---------------------------------------------------------------------------
 -- Staff (created early: other tables hold FKs to it)
@@ -242,6 +237,9 @@ create table if not exists profiles (
 
 -- ---------------------------------------------------------------------------
 -- Applications
+-- status is text + CHECK (not an enum) so workflow states can evolve without a
+-- locked enum migration. form_data holds the purpose-specific structured
+-- answers; form_kind records which guided form produced the application.
 -- ---------------------------------------------------------------------------
 create table if not exists applications (
   id uuid primary key default gen_random_uuid(),
@@ -251,10 +249,15 @@ create table if not exists applications (
   destination_country_id uuid references countries(id) on delete set null,
   origin_country_id uuid references countries(id) on delete set null,
   category_code text,
-  status app_status not null default 'submitted',
+  status text not null default 'draft'
+    check (status in ('draft','submitted','under_review','awaiting_documents','awaiting_customer',
+                      'in_progress','submitted_to_authority','approved','refused','withdrawn','closed')),
   status_note text,
   assigned_staff_id uuid references staff(id) on delete set null,
   travel_date date,
+  form_data jsonb not null default '{}'::jsonb,
+  form_kind text not null default 'tourist',
+  submitted_at timestamptz,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -262,12 +265,13 @@ create table if not exists applications (
 create index if not exists idx_applications_customer on applications(customer_id, created_at desc);
 create index if not exists idx_applications_status on applications(status);
 create index if not exists idx_applications_assigned on applications(assigned_staff_id);
+create index if not exists idx_applications_form_gin on applications using gin (form_data);
 
 create table if not exists application_status_history (
   id uuid primary key default gen_random_uuid(),
   application_id uuid not null references applications(id) on delete cascade,
-  old_status app_status,
-  new_status app_status not null,
+  old_status text,
+  new_status text not null,
   note text,
   changed_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now()
@@ -396,8 +400,11 @@ create table if not exists contact_settings (
 
 create table if not exists brand_settings (
   id integer primary key default 1 check (id = 1),
-  business_name text not null default 'Visa & Travel Services',
+  business_name text not null default 'VisaBridge Global',
+  tagline_en text not null default 'Your Journey. Our Guidance.',
+  tagline_bn text,
   logo_svg text,
+  logo_dark_svg text,
   favicon_svg text,
   primary_color text not null default '#0A1F44',
   secondary_color text not null default '#C9A227',
@@ -458,13 +465,13 @@ create index if not exists idx_audit_actor on audit_logs(actor_id, created_at de
 -- Updated-at trigger
 -- ---------------------------------------------------------------------------
 create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql as $fn$
 begin
   new.updated_at = now();
   return new;
-end $$;
+end $fn$;
 
-do $$
+do $do$
 declare t text;
 begin
   foreach t in array array[
@@ -477,4 +484,4 @@ begin
       'create trigger set_updated_at_%1$s before update on public.%1$s
        for each row execute function public.set_updated_at()', t);
   end loop;
-end $$;
+end $do$;

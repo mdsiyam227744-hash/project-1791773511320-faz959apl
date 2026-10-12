@@ -28,8 +28,12 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       </a>
       <header className="sticky top-0 z-40 border-b border-navy-100 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Link href="/" aria-label={brand.businessName}>
-            <BrandMark name={brand.businessName} logoSvg={brand.logoSvg} />
+          <Link href="/" aria-label={`${brand.businessName} — ${brand.tagline[locale]}`}>
+            <BrandMark
+              name={brand.businessName}
+              logoSvg={brand.logoSvg}
+              tagline={brand.tagline[locale]}
+            />
           </Link>
           <nav aria-label="Main" className="hidden items-center gap-6 lg:flex">
             {nav.map((item) => (
@@ -81,7 +85,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <footer className="mt-16 border-t border-navy-100 bg-navy-950 text-navy-100">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-4">
           <div className="space-y-3">
-            <BrandMark name={brand.businessName} logoSvg={brand.logoSvg} />
+            <BrandMark name={brand.businessName} logoSvg={brand.logoSvg} variant="dark" />
             <p className="text-xs leading-relaxed text-navy-200">
               {t(locale, "common.disclaimer")}
             </p>

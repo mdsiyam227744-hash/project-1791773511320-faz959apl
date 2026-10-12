@@ -1,4 +1,4 @@
-import { createClient, isSupabaseConfigured } from "./supabase/server.ts";
+import { createClient, isSupabaseConfigured } from "./supabase/server";
 
 export type FeeKind = "official_government" | "agency_service" | "third_party" | "optional_service";
 

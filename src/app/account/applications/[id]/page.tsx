@@ -7,6 +7,36 @@ import { t, type Locale } from "@/lib/i18n";
 import AppMessages from "./messages";
 import DocumentUploader from "./uploader";
 
+/** Renders the structured guided-form answers as a readable summary. */
+function FormDataSummary({ data, kind }: { data: Record<string, unknown>; kind: string }) {
+  const entries = Object.entries(data).filter(
+    ([, v]) => v !== "" && v !== null && v !== undefined && v !== false,
+  );
+  if (entries.length === 0) return null;
+  const label = (key: string) =>
+    key
+      .replace(/_/g, " ")
+      .replace(/^declaration/, "Declaration:")
+      .replace(/^has/, "Has ");
+  return (
+    <details className="mt-3 rounded-md bg-navy-50 p-3 text-sm">
+      <summary className="cursor-pointer font-medium text-navy-700">
+        Application form details ({kind})
+      </summary>
+      <dl className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+        {entries.map(([k, v]) => (
+          <div key={k}>
+            <dt className="text-xs capitalize text-navy-500">{label(k)}</dt>
+            <dd className="break-words">
+              {typeof v === "boolean" ? "Yes" : String(v)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
 export default async function ApplicationDetail({
   params,
 }: {
@@ -17,17 +47,34 @@ export default async function ApplicationDetail({
   const supabase = createClient();
 
   // RLS guarantees customers only see their own rows; we filter explicitly too.
-  const { data: app } = await supabase
+  const { data } = await supabase
     .from("applications")
     .select(
       `id, reference_no, status, status_note, notes, travel_date, created_at, updated_at,
-       category_code,
+       category_code, form_kind, form_data,
        destination:countries(name_en),
        visa:visa_listings(official_name_en, slug)`,
     )
     .eq("id", id)
     .eq("customer_id", user.id)
     .maybeSingle();
+  const app = data as unknown as
+    | {
+        id: string;
+        reference_no: string;
+        status: string;
+        status_note: string | null;
+        notes: string | null;
+        travel_date: string | null;
+        created_at: string;
+        updated_at: string;
+        category_code: string | null;
+        form_kind: string | null;
+        form_data: Record<string, unknown> | null;
+        destination: { name_en: string | null } | null;
+        visa: { official_name_en: string; slug: string } | null;
+      }
+    | null;
 
   if (!app) notFound();
   const locale: Locale = "en";
@@ -90,6 +137,7 @@ export default async function ApplicationDetail({
             {app.notes ? (
               <p className="mt-3 rounded bg-navy-50 p-3 text-sm text-navy-700">{app.notes}</p>
             ) : null}
+            <FormDataSummary data={(app.form_data ?? {}) as Record<string, unknown>} kind={app.form_kind ?? "form"} />
           </section>
 
           {/* Timeline */}

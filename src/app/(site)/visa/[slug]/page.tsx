@@ -153,7 +153,7 @@ export default async function VisaDetailPage({
 
       <div className="mt-10 flex flex-wrap gap-3">
         <Link
-          href={`/apply?visa=${listing.slug}`}
+          href={`/apply/guided?visa=${listing.slug}`}
           className="rounded-md bg-[var(--brand-primary)] px-5 py-3 text-sm font-semibold text-white hover:opacity-90"
         >
           {t(locale, "cta.apply")}

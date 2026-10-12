@@ -10,7 +10,7 @@ export default async function AdminVisas() {
   const supabase = createClient();
   const [countries, categories] = await Promise.all([listCountries(), listCategories()]);
 
-  const { data: listings } = await supabase
+  const { data: listingRows } = await supabase
     .from("visa_listings")
     .select(
       `id, slug, official_name_en, status, last_verified, category_code,
@@ -19,6 +19,16 @@ export default async function AdminVisas() {
     )
     .order("updated_at", { ascending: false })
     .limit(200);
+  const listings = (listingRows ?? []) as unknown as {
+    id: string;
+    slug: string;
+    official_name_en: string;
+    status: string;
+    last_verified: string | null;
+    category_code: string;
+    destination: { name_en: string | null };
+    origin: { name_en: string | null } | null;
+  }[];
 
   const destOptions = countries.filter((c) => c.is_destination);
 

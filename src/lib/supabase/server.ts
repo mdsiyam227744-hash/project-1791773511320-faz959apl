@@ -7,6 +7,10 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 /**
  * Authenticated client for server components/actions — session from cookies.
  * Next 15: cookies() is async, so the adapters are async (supported by @supabase/ssr).
+ *
+ * The client is intentionally untyped beyond `unknown`: generating full Database
+ * types requires an accessible database. Embedded-join results are narrowed at
+ * their call sites (see `src/lib/joins.ts`).
  */
 export function createClient() {
   if (!url || !anonKey) {

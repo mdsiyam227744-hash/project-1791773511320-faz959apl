@@ -23,6 +23,16 @@ export default async function AdminContent() {
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm">
+              <span className="mb-1 block font-medium">Tagline (English)</span>
+              <input name="tagline_en" defaultValue={brand.tagline.en} className={inputCls} />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Tagline (Bangla)</span>
+              <input name="tagline_bn" defaultValue={brand.tagline.bn} className={inputCls} />
+            </label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
               <span className="mb-1 block font-medium">Primary color (hex)</span>
               <input name="primary_color" defaultValue={brand.primaryColor} pattern="#[0-9a-fA-F]{6}" className={inputCls} />
             </label>
@@ -40,8 +50,16 @@ export default async function AdminContent() {
             </select>
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block font-medium">Logo SVG (optional — raw SVG markup)</span>
+            <span className="mb-1 block font-medium">
+              Custom logo SVG (optional — overrides the bundled VisaBridge Global logo)
+            </span>
             <textarea name="logo_svg" rows={3} defaultValue={brand.logoSvg ?? ""} className={`${inputCls} font-mono text-xs`} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">
+              Custom favicon SVG (optional — overrides the bundled icon)
+            </span>
+            <textarea name="favicon_svg" rows={3} defaultValue={brand.faviconSvg ?? ""} className={`${inputCls} font-mono text-xs`} />
           </label>
           <button className="rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white">
             Save branding

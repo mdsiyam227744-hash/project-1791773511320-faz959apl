@@ -3,7 +3,23 @@ import { createClient } from "@/lib/supabase/server";
 import { StatusPill } from "@/components/status-pill";
 import Link from "next/link";
 import { updateApplication } from "./actions";
-import { APP_STATUSES, STAFF_LIST } from "./shared";
+import { APP_STATUSES, ALLOWED_TRANSITIONS, STAFF_LIST } from "./shared";
+import type { JoinedProfile, JoinedCountry, JoinedStaff } from "@/lib/joins";
+
+interface AdminApplicationRow {
+  id: string;
+  reference_no: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  category_code: string | null;
+  form_kind: string | null;
+  form_data: Record<string, unknown> | null;
+  notes: string | null;
+  customer: JoinedProfile | null;
+  destination: JoinedCountry | null;
+  assigned_staff: JoinedStaff | null;
+}
 
 export default async function AdminApplications({
   searchParams,
@@ -17,18 +33,21 @@ export default async function AdminApplications({
   let query = supabase
     .from("applications")
     .select(
-      `id, reference_no, status, created_at, updated_at, category_code, notes,
+      `id, reference_no, status, created_at, updated_at, category_code, form_kind, form_data, notes,
        customer:profiles(full_name),
        destination:countries(name_en),
        assigned_staff:staff(display_name)`,
     )
     .order("updated_at", { ascending: false })
     .limit(100);
-  if (status) query = query.eq("status", status);
+  if (status === "draft") query = query.eq("status", "draft");
+  else if (status) query = query.neq("status", "draft");
   if (q) query = query.ilike("reference_no", `%${q}%`);
-  const { data: apps } = await query;
+  const { data } = await query;
+  const apps = (data ?? []) as unknown as AdminApplicationRow[];
 
-  const { data: staffList } = await supabase.from("staff").select("id, display_name");
+  const { data: staffRows } = await supabase.from("staff").select("id, display_name");
+  const staffList = (staffRows ?? []) as unknown as { id: string; display_name: string }[];
 
   return (
     <div>
@@ -42,8 +61,9 @@ export default async function AdminApplications({
           className="rounded-md border border-navy-200 px-3 py-2 text-sm"
         />
         <select name="status" defaultValue={status ?? ""} className="rounded-md border border-navy-200 px-3 py-2 text-sm">
-          <option value="">All statuses</option>
-          {APP_STATUSES.map((s) => (
+          <option value="">All active (drafts hidden)</option>
+          <option value="draft">Drafts only</option>
+          {APP_STATUSES.filter((s) => s !== "draft").map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -79,6 +99,9 @@ export default async function AdminApplications({
                 <td className="px-4 py-3">{a.destination?.name_en ?? "—"}</td>
                 <td className="px-4 py-3">
                   <StatusPill status={a.status} locale="en" />
+                  {a.form_kind ? (
+                    <p className="mt-1 text-[11px] uppercase tracking-wide text-navy-400">{a.form_kind}</p>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3 text-xs text-navy-600">
                   {a.assigned_staff?.display_name ?? "Unassigned"}
@@ -89,12 +112,13 @@ export default async function AdminApplications({
                     <form action={updateApplication} className="mt-2 w-56 space-y-2">
                       <input type="hidden" name="application_id" value={a.id} />
                       <select name="status" defaultValue={a.status} className="w-full rounded border border-navy-200 px-2 py-1.5 text-xs" aria-label="Set status">
-                        {APP_STATUSES.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
+                        {a.status === "draft"
+                          ? <option value="draft">draft (customer editing)</option>
+                          : [a.status, ...(ALLOWED_TRANSITIONS[a.status] ?? [])].map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
                       </select>
-                      <select name="assigned_staff_id" defaultValue={a.assigned_staff?.id ?? ""} className="w-full rounded border border-navy-200 px-2 py-1.5 text-xs" aria-label="Assign staff">
-                        <option value="">Unassigned</option>
+                      <select name="assigned_staff_id" defaultValue={a.assigned_staff?.id ?? ""} className="w-full rounded border border-navy-200 px-2 py-1.5 text-xs" aria-label="Assign staff">                        <option value="">Unassigned</option>
                         {(staffList ?? []).map((s) => (
                           <option key={s.id} value={s.id}>{s.display_name}</option>
                         ))}
@@ -118,6 +142,13 @@ export default async function AdminApplications({
           <p className="p-6 text-center text-sm text-navy-500">No applications match the filter.</p>
         ) : null}
       </div>
+
+      {/* Structured answers are visible in the customer's own application page;
+          the queue links straight there. */}
+      <p className="mt-3 text-xs text-navy-500">
+        Open an application row to manage its status, assignment, and customer note. Full form
+        answers and documents are on the application page (linked from the reference number).
+      </p>
     </div>
   );
 }

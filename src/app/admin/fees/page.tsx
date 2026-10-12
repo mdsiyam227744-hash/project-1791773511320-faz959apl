@@ -11,7 +11,7 @@ export default async function AdminFees() {
   const { staff } = await requireStaff(["super_admin", "application_manager"]);
   const supabase = createClient();
 
-  const [{ data: fees }, { data: history }] = await Promise.all([
+  const [{ data: fees }, { data: historyRows }] = await Promise.all([
     supabase.from("service_fees").select("*").order("key"),
     supabase
       .from("service_fee_history")
@@ -19,6 +19,15 @@ export default async function AdminFees() {
       .order("created_at", { ascending: false })
       .limit(30),
   ]);
+  const history = (historyRows ?? []) as unknown as {
+    service_fee_id: string;
+    previous_amount: number | null;
+    new_amount: number;
+    currency: string;
+    created_at: string;
+    changed_by: string | null;
+    staff: { display_name: string | null } | null;
+  }[];
 
   return (
     <div>

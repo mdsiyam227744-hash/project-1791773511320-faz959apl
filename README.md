@@ -1,8 +1,19 @@
-# International Visa & Travel Services Platform
+# VisaBridge Global — International Visa & Travel Services Platform
+
+Tagline: **Your Journey. Our Guidance.**
 
 A database-backed, multilingual visa assistance / immigration / overseas employment / travel
 services platform built with Next.js (App Router), TypeScript (strict), Tailwind CSS v4,
 Supabase Postgres (with Row Level Security) and Supabase Auth.
+
+## Brand assets
+
+`public/brand/` holds the first-party identity: the navy/gold globe-and-checkmark icon
+(`logo-icon.svg`, `favicon.svg`, PNG exports at 16/32/48/192/512), and the full wordmark in
+light (`logo-full.svg`) and dark (`logo-full-dark.svg`) variants. Everything is regenerable:
+`node scripts/render-brand-png.cjs` rebuilds the PNGs from the shared geometry. An
+administrator can override the logo and favicon at any time from Content & branding — the
+bundled assets are the defaults, not hardcodes.
 
 ## Ground rules baked into the code
 

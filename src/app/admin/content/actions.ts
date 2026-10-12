@@ -7,10 +7,13 @@ import { revalidatePath } from "next/cache";
 
 const brandSchema = z.object({
   business_name: z.string().trim().min(2).max(120),
+  tagline_en: z.string().trim().max(160).optional().or(z.literal("")),
+  tagline_bn: z.string().trim().max(160).optional().or(z.literal("")),
   primary_color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   secondary_color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   default_locale: z.enum(["en", "bn"]),
   logo_svg: z.string().max(20000).optional().or(z.literal("")),
+  favicon_svg: z.string().max(20000).optional().or(z.literal("")),
 });
 
 export async function updateBrand(formData: FormData) {
@@ -23,10 +26,13 @@ export async function updateBrand(formData: FormData) {
     .from("brand_settings")
     .update({
       business_name: parsed.data.business_name,
+      tagline_en: parsed.data.tagline_en || null,
+      tagline_bn: parsed.data.tagline_bn || null,
       primary_color: parsed.data.primary_color,
       secondary_color: parsed.data.secondary_color,
       default_locale: parsed.data.default_locale,
       logo_svg: parsed.data.logo_svg || null,
+      favicon_svg: parsed.data.favicon_svg || null,
       updated_by: userId,
     })
     .eq("id", 1);
