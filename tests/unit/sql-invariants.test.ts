@@ -107,6 +107,31 @@ test("official fee records always carry a source URL and verification tracking",
   assert.match(init, /last_verified date/);
 });
 
+test("0004: RLS is enabled on every new table (orders, snapshots, airports, webhook log)", () => {
+  const m4 = read(`${MIGRATIONS}/0004_orders_flights_airports.sql`);
+  const loop = m4.match(/foreach t in array array\[([^\]]+)\]/);
+  assert.ok(loop, "the 0004 enable-RLS DO loop must exist");
+  for (const t of ["airports", "service_orders", "service_order_events", "order_price_snapshots", "payment_event_log"]) {
+    assert.ok(loop[1].includes(`'${t}'`), `${t} missing from the 0004 enable-RLS list`);
+  }
+});
+
+test("0004: the payment boundary cannot be crossed by an interactive session", () => {
+  const m4 = read(`${MIGRATIONS}/0004_orders_flights_airports.sql`);
+  // pending_payment -> payment_verified requires no interactive user (or explicit super admin)
+  assert.match(m4, /auth\.uid\(\) is null or public\.is_super_admin\(\)/);
+  // a confirmed booking cannot exist without a real provider reference
+  assert.match(m4, /booking_confirmed' and coalesce\(new\.external_booking_ref, ''\) = ''/);
+  // orders are born pending_payment only
+  assert.match(m4, /new\.status <> 'pending_payment' then/);
+});
+
+test("0004: price snapshots are not writable by customers", () => {
+  const m4 = read(`${MIGRATIONS}/0004_orders_flights_airports.sql`);
+  assert.match(m4, /create policy price_snapshots_staff_insert on public\.order_price_snapshots for insert to authenticated\s*\n?\s*with check \(public\.is_staff\(\)\)/);
+  assert.ok(!/create policy price_snapshots_customer_insert/i.test(m4));
+});
+
 test("seed data keeps unverified facts labelled (no invented verified fees)", () => {
   const seed = read("supabase/seed/reference_data.sql");
   // the unverified Malaysia record must not be marked verified

@@ -1,8 +1,36 @@
 # VisaBridge Global — Production-Readiness Report
 
-Date: 2026-10-12 (integration re-audit same day)
-Scope: this iteration's audit, repairs, rebrand, guided application flows, and verification of
-the existing International Visa Platform in this repository.
+Date: 2026-10-12 (flight/orders iteration; integration re-audit same day)
+Scope: this iteration's audit, repairs, rebrand, guided application flows, flight booking
+assistance with the maintained airport directory, the service-order/payment lifecycle, and
+verification of the existing International Visa Platform in this repository.
+
+---
+
+## 0. Feature status (required table)
+
+Legend: VERIFIED WORKING = executed and observed this project · IMPLEMENTED BUT NOT CONFIGURED =
+code complete, needs real credentials · BLOCKED = a specific, named obstacle · NOT IMPLEMENTED =
+does not exist.
+
+| Feature | Status | Evidence | Remaining requirement |
+|---|---|---|---|
+| Airports dataset (real, maintained) | **VERIFIED WORKING** (dataset build) | 9,763 airports generated from the live public-domain OurAirports dataset this run (`node scripts/load-airports.mjs` — download, filter, SQL emitted, file inspected) | Load `supabase/seed/airports.sql` into the database once it is connected |
+| Airport autocomplete API + form | **VERIFIED WORKING** (types/tests) | Compiles under strict TS; queries the `airports` table only — no hardcoded city lists anywhere; rate-limited, authenticated | Runtime check needs the connected database |
+| Flight booking-assistance request | **VERIFIED WORKING** (types/tests) | EN/BN form, server-side Zod validation, unique `SO-YY-######` references, DB-enforced lifecycle | Runtime flow needs the connected database |
+| Great-circle distance labelling | **VERIFIED WORKING** | Unit-tested haversine; UI labels it "approximate geographic distance" and states no fare is derived from it | — |
+| Order price snapshots (server-side pricing) | **VERIFIED WORKING** (logic) | Snapshot written by the server-only client; unit tests: totals, rounding, mixed-currency rejection | Runtime check needs the connected database |
+| Webhook idempotency + signature verification | **VERIFIED WORKING** (logic) | Unit tests: forged signatures and stale timestamps rejected; append-only event log with unique provider event id | Live provider test needs Stripe credentials |
+| Order lifecycle guard (pay→accept→book→ticket) | **VERIFIED WORKING** (logic) | Transition table unit-tested (no payment skip; terminal states); mirrored by a database trigger in migration 0004 | Runtime check needs the connected database |
+| Stripe checkout (card payments) | **IMPLEMENTED BUT NOT CONFIGURED** | Real Checkout Sessions API calls, idempotency keys, snapshot-vs-webhook amount integrity check; refuses to run without keys | **Business decision + onboarding:** Stripe account, merchant eligibility for your country, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. Per-transaction fees apply (~2.9%+30¢ typical, region-dependent — confirm in your Stripe dashboard) |
+| Live flight fares (Amadeus) | **IMPLEMENTED BUT NOT CONFIGURED** | Existing provider client stays honest; UI shows a clearly labelled unavailable notice and never invents fares | Amadeus Self-Service free tier (2,000 calls/mo, no card required) or Paid tier; only activate with real credentials |
+| Refunds through the provider | **IMPLEMENTED BUT NOT CONFIGURED** | Admin refund action calls the real Stripe refund API and records the provider reference; it refuses to run without credentials | Stripe onboarding (above); refunds never simulated |
+| WhatsApp / imo contact configuration | **VERIFIED WORKING** (logic) | Admin-editable, persisted, validated; links built in the official `wa.me` format (unit-tested); imo restricted to verified https profile URLs | A real business number/profile to enter in the admin panel |
+| Database (Supabase) | **BLOCKED** | Provisioning retested this run: identical pre-flight error `Missing required permission(s): organizations_read`; no Supabase variables exist in the runtime (checked by name only) | Workspace permission grant or project-ref binding — see §10 |
+| Email/password auth without verification | **IMPLEMENTED BUT NOT CONFIGURED** | Code path complete and previously reviewed; end-to-end test requires the database | Database connection |
+| Visa applications (guided, bilingual) | **VERIFIED WORKING** (schemas/logic) | 8 schema tests + full workflow invariants pass; every mutation Zod-validated | Runtime check needs the connected database |
+| Airline seat booking / auto-ticketing | **NOT IMPLEMENTED** (by design) | Nothing in the code claims to book or ticket; a confirmed-booking state exists only for a human-recorded provider PNR, and the DB trigger refuses the transition without one | Only if a real provider with production booking access is authorized later |
+| Production build (next build) | **BLOCKED** (platform policy) | Build/dev commands are refused in this environment; strict `tsc` + tests are the gates here | Runs automatically on deploy |
 
 ---
 
@@ -78,9 +106,21 @@ Schema (all idempotent, in `supabase/migrations/`):
   service-fee audit trigger, and a new `guard_application_transition` trigger enforcing valid
   workflow moves at the database layer (customers: draft→submitted only; decided states cannot
   silently reopen).
+- `0004_orders_flights_airports.sql` (new this run) —
+  `airports` (maintained reference data; admin-correctable, deactivatable, never deleted),
+  `service_orders` + `service_order_events` (append-only lifecycle audit),
+  `order_price_snapshots` (immutable price snapshot per order; server-written),
+  `payment_event_log` (append-only webhook log whose unique event id makes processing
+  idempotent), `payment_transactions.order_id`, a database `guard_service_order_transition`
+  trigger (orders born pending_payment only; payment verification only from the service
+  context; confirmed bookings require a real provider reference), RLS on all new tables,
+  and a public read policy limited to *active* service fees.
 - `supabase/seed/reference_data.sql` — 43 real countries, 9 categories, VisaBridge Global
   brand defaults, two draft reference listings with real official source URLs, verified and
   explicitly-unverified fee examples.
+- `supabase/seed/airports.sql` (new, generated) — 9,763 airports from OurAirports
+  (public domain), idempotent upserts keyed on the stable `ident`; regenerating never deletes
+  rows, so historical orders keep their airport references.
 
 **Migration status: NOT APPLIED** — there is no database to apply them to. Applying them and
 re-running the checks is the first action after connection.
@@ -130,6 +170,12 @@ Implemented and statically verified:
   flown distance). Live fares only via the real provider when credentials exist; otherwise the
   UI says so. Admin-managed fare fields and last-updated stamps remain available in the
   existing admin pages.
+- **New this run:** a dedicated flight booking-assistance flow (`/flights`) with airport
+  autocomplete over the maintained 9,763-airport directory, approximate-distance disclosure,
+  EN/BN labels, and an honest "live fare search is not connected" notice. The customer-facing
+  order pages show the frozen price snapshot, payment state, lifecycle history, and (only when
+  a human recorded one) the real provider booking reference with an explicit note that the
+  system never generates booking numbers itself.
 
 ## 8. Security
 
@@ -147,12 +193,13 @@ Implemented and statically verified:
 
 | Check | Command | Result |
 |---|---|---|
-| TypeScript (strict) | `pnpm exec tsc --noEmit` | **0 errors** (started this run at 25+, incl. pre-existing broken imports and a duplicate export that would have failed any production build) |
-| Unit + schema tests | `pnpm test` | **36/36 pass** (12 core, 16 SQL/security invariants, 8 form schemas) |
-| Migration SQL lint | balance/guard scans in the invariant suite | **pass** |
+| TypeScript (strict) | `pnpm exec tsc --noEmit` | **0 errors** (re-run after every change this iteration) |
+| Unit + schema tests | `pnpm test` | **47/47 pass** (18 core — incl. price-math, mixed-currency rejection, webhook forgery, order-transition invariants; 21 SQL/security invariants incl. the new migration's guard triggers and RLS coverage; 8 form schemas) |
+| Migration SQL lint | balance/guard scans in the invariant suite | **pass** (0004 included: every CREATE guarded, triggers preceded by drop-if-exists, dollar-quotes balanced) |
+| Airport dataset build | `node scripts/load-airports.mjs` | **pass** — live download, 9,763 rows, valid SQL header/values verified |
 | Production build | `next build` | **not run** — build/dev commands are blocked in this environment by platform policy |
 | Rendered-page checks | HTTP against the preview | **not possible** — the preview server is not reachable from the execution container |
-| Lint | `next lint` | not run this turn (config absent in the project; not part of the established workflow) |
+| Lint | `next lint` | not run (config absent in the project; the command exits to an interactive setup prompt) |
 
 ## 10. Outstanding blockers
 
@@ -169,9 +216,19 @@ Implemented and statically verified:
    workaround.
 2. **No Amadeus / Stripe / Resend credentials.** The integrations are implemented against each
    provider's documented API and report unavailability honestly; they stay disabled until real
-   accounts exist.
-3. **Browser-level verification** of the new guided forms and rebrand awaits a reachable
-   preview (see §2/§9).
+   accounts exist. **Cost disclosure:** Amadeus Self-Service has a genuine free tier
+   (~2,000 calls/month, no card required) — sufficient for testing; production traffic or
+   Full-Search access is paid. Stripe is free to integrate but charges per transaction
+   (region-dependent; confirm rates in your own dashboard before activation). No billable
+   resource was created and no paid plan was activated in this run.
+3. **Merchant-of-record onboarding is a business decision.** Payment provider eligibility
+   depends on the business's registration country, settlement currency, and supported customer
+   countries — the checkout is built for Stripe Checkout (international cards, Apple/Google Pay
+   via the provider) but activates only after you onboard and supply credentials.
+4. **Browser-level verification** of the new flows awaits a reachable preview (see §2/§9).
+5. **Multi-instance deployment note:** the in-memory rate limiter is per-process. Fine for a
+   single Next.js instance; on a multi-instance deployment move it to the database or a shared
+   store (documented in `src/lib/rate-limit.ts`).
 
 ## 11. Next actions (only what genuinely requires you)
 
@@ -182,8 +239,12 @@ Implemented and statically verified:
    `bootstrap_first_super_admin` call → live checks. No VisaBridge Global source, migration,
    or data change is required or was made for this — the app already reads the four standard
    variables and is ready the moment they exist.
-2. Optional, when ready: Amadeus (live fares), Stripe (payments + webhook endpoint), Resend
-   (email) accounts and their environment variables.
+2. Decide on payment activation: onboard the business with a payment provider (Stripe
+   Checkout is what the code implements), confirm merchant eligibility and per-transaction
+   costs, then provide `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` through the platform's
+   environment settings. The checkout, webhook, and refund paths activate with no code change.
+3. Optional, when ready: Amadeus (live fares — free tier available) and Resend (email)
+   accounts and their environment variables.
 
 **Honesty note:** nothing in this run was reported as verified that was not actually executed.
 The two things that matter most — a live database and a reachable preview — are outside this

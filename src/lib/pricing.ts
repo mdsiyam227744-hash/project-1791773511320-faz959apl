@@ -3,6 +3,31 @@
  * Dependency-free so it can be unit-tested with the plain Node test runner.
  */
 
+// ---------------------------------------------------------------------------
+// Order price math (price snapshots) — shared by the order library and tests
+// ---------------------------------------------------------------------------
+export interface OrderLine {
+  unitAmount: number;
+  quantity: number;
+  currency: string;
+}
+
+/** Line total rounded half-up at two decimals (no float drift). */
+export function lineTotal(line: OrderLine): number {
+  return Math.round(line.unitAmount * line.quantity * 100) / 100;
+}
+
+/** Order total: sums line totals, rejects mixed-currency snapshots. */
+export function orderTotal(lines: OrderLine[]): { total: number; currency: string | null } {
+  if (lines.length === 0) return { total: 0, currency: null };
+  const currency = lines[0].currency;
+  if (lines.some((l) => l.currency !== currency)) {
+    throw new Error("mixed_currency_snapshot");
+  }
+  const total = lines.reduce((sum, l) => sum + lineTotal(l), 0);
+  return { total: Math.round(total * 100) / 100, currency };
+}
+
 export type FeeKind = "official_government" | "agency_service" | "third_party" | "optional_service";
 
 export const FEE_KIND_LABELS: Record<FeeKind, string> = {

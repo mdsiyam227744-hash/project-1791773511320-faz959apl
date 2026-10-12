@@ -26,6 +26,9 @@ export default async function AccountLayout({ children }: { children: React.Reac
                 {t(locale, "nav.admin")}
               </Link>
             ) : null}
+            <Link href="/account/orders" className="rounded-md px-3 py-1.5 text-navy-700 hover:bg-navy-50">
+              {t(locale, "orders.title")}
+            </Link>
             <Link href="/account/profile" className="rounded-md px-3 py-1.5 text-navy-700 hover:bg-navy-50">
               {t(locale, "dash.profile")}
             </Link>

@@ -5,6 +5,8 @@ import { t } from "@/lib/i18n";
 import { StatusPill } from "@/components/status-pill";
 import { FORM_KINDS } from "@/lib/application-forms";
 import { asJoinedCountry } from "@/lib/joins";
+import { OrderStatusPill } from "@/components/order-status";
+import type { OrderStatus } from "@/lib/orders";
 
 interface AccountApplicationRow {
   id: string;
@@ -23,15 +25,31 @@ export default async function AccountHome() {
   const locale = (profile?.locale as "en" | "bn") ?? "en";
 
   const supabase = createClient();
-  const { data } = await supabase
-    .from("applications")
-    .select(
-      `id, reference_no, status, created_at, updated_at, category_code, form_kind,
-       destination:countries(name_en)`,
-    )
-    .eq("customer_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const [appsResult, ordersResult] = await Promise.all([
+    supabase
+      .from("applications")
+      .select(
+        `id, reference_no, status, created_at, updated_at, category_code, form_kind,
+         destination:countries(name_en)`,
+      )
+      .eq("customer_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("service_orders")
+      .select("id, reference_no, status, service_label, created_at")
+      .eq("customer_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+  const data = appsResult.data;
+  const recentOrders = (ordersResult.data ?? []) as unknown as {
+    id: string;
+    reference_no: string;
+    status: OrderStatus;
+    service_label: string;
+    created_at: string;
+  }[];
   const applications = (data ?? []) as unknown as AccountApplicationRow[];
 
   return (
@@ -120,6 +138,33 @@ export default async function AccountHome() {
           </div>
         )}
       </section>
+
+      {recentOrders.length > 0 ? (
+        <section className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">{t(locale, "orders.title")}</h2>
+            <Link href="/account/orders" className="text-sm underline">
+              {t(locale, "common.viewAll")}
+            </Link>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {recentOrders.map((o) => (
+              <li
+                key={o.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm"
+              >
+                <span>
+                  <Link href={`/account/orders/${o.id}`} className="font-mono font-medium hover:underline">
+                    {o.reference_no}
+                  </Link>
+                  <span className="text-navy-500"> · {o.service_label}</span>
+                </span>
+                <OrderStatusPill status={o.status} locale={locale} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

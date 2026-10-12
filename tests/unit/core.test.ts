@@ -13,6 +13,67 @@ import { buildWhatsAppLink, buildImoLink } from "../../src/lib/contact-links.ts"
 import { verifyStripeSignature } from "../../src/lib/webhook-signature.ts";
 import { createHmac } from "node:crypto";
 import { t, isLocale } from "../../src/lib/i18n.ts";
+import { lineTotal, orderTotal } from "../../src/lib/pricing.ts";
+import { ORDER_TRANSITIONS, type OrderStatus } from "../../src/lib/order-transitions.ts";
+
+// ---------------------------------------------------------------------------
+// Order price math — snapshot totals
+// ---------------------------------------------------------------------------
+test("lineTotal rounds half-up at two decimals without float drift", () => {
+  assert.equal(lineTotal({ unitAmount: 19.99, quantity: 3, currency: "USD" }), 59.97);
+  assert.equal(lineTotal({ unitAmount: 0.005, quantity: 1, currency: "USD" }), 0.01);
+});
+
+test("orderTotal sums line totals and reports the single currency", () => {
+  const { total, currency } = orderTotal([
+    { unitAmount: 25, quantity: 1, currency: "USD" },
+    { unitAmount: 10.5, quantity: 2, currency: "USD" },
+  ]);
+  assert.equal(total, 46);
+  assert.equal(currency, "USD");
+});
+
+test("orderTotal refuses mixed-currency snapshots instead of silently totalling", () => {
+  assert.throws(
+    () => orderTotal([{ unitAmount: 10, quantity: 1, currency: "USD" }, { unitAmount: 5, quantity: 1, currency: "BDT" }]),
+    /mixed_currency_snapshot/,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Order lifecycle — transition validity (mirrors the DB guard trigger)
+// ---------------------------------------------------------------------------
+test("unpaid orders can only be paid-verified or cancelled", () => {
+  assert.deepEqual(ORDER_TRANSITIONS.pending_payment.sort(), ["cancelled", "payment_verified"]);
+});
+
+test("payment verification can never be skipped, and decided states are terminal", () => {
+  const keys = Object.keys(ORDER_TRANSITIONS) as OrderStatus[];
+  // No transition may skip the payment boundary: ticketed/completed states are
+  // only reachable through booking_confirmed, which is only reachable from
+  // accepted/info_requested — all downstream of payment_verified.
+  for (const [from, tos] of Object.entries(ORDER_TRANSITIONS)) {
+    for (const to of tos) {
+      assert.ok(
+        keys.includes(to),
+        `transition ${from} -> ${to} references an unknown status`,
+      );
+    }
+  }
+  assert.deepEqual(ORDER_TRANSITIONS.completed, []);
+  assert.deepEqual(ORDER_TRANSITIONS.cancelled, []);
+  assert.deepEqual(ORDER_TRANSITIONS.refunded, []);
+  assert.ok(!ORDER_TRANSITIONS.pending_payment.includes("accepted"));
+  assert.ok(!ORDER_TRANSITIONS.pending_payment.includes("ticketed"));
+});
+
+test("staff cannot fabricate a booking confirmation in the transition table either", () => {
+  // booking_confirmed requires a real external reference — enforced by the DB
+  // trigger; the map must not route cancelled/rejected orders to it.
+  assert.ok(!ORDER_TRANSITIONS.cancelled.includes("booking_confirmed"));
+  assert.ok(!ORDER_TRANSITIONS.rejected.includes("booking_confirmed"));
+});
+
 
 // ---------------------------------------------------------------------------
 // Distance — great-circle, never labelled as flown distance

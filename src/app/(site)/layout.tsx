@@ -15,6 +15,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
     { href: "/visa-categories", label: t(locale, "nav.visas") },
     { href: "/jobs", label: t(locale, "nav.jobs") },
     { href: "/planner", label: t(locale, "nav.planner") },
+    { href: "/flights", label: t(locale, "nav.flights") },
     { href: "/contact", label: t(locale, "nav.contact") },
   ];
 
