@@ -1,9 +1,10 @@
 # VisaBridge Global — Production-Readiness Report
 
-Date: 2026-10-12 (flight/orders iteration; integration re-audit same day)
+Date: 2026-10-12 (admin-controlled payment methods iteration; integration re-audit same day)
 Scope: this iteration's audit, repairs, rebrand, guided application flows, flight booking
-assistance with the maintained airport directory, the service-order/payment lifecycle, and
-verification of the existing International Visa Platform in this repository.
+assistance with the maintained airport directory, the service-order/payment lifecycle,
+administrator-configured payment methods with customer manual-payment checkout and staff
+verification, and verification of the existing International Visa Platform in this repository.
 
 ---
 
@@ -25,8 +26,13 @@ does not exist.
 | Stripe checkout (card payments) | **IMPLEMENTED BUT NOT CONFIGURED** | Real Checkout Sessions API calls, idempotency keys, snapshot-vs-webhook amount integrity check; refuses to run without keys | **Business decision + onboarding:** Stripe account, merchant eligibility for your country, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. Per-transaction fees apply (~2.9%+30¢ typical, region-dependent — confirm in your Stripe dashboard) |
 | Live flight fares (Amadeus) | **IMPLEMENTED BUT NOT CONFIGURED** | Existing provider client stays honest; UI shows a clearly labelled unavailable notice and never invents fares | Amadeus Self-Service free tier (2,000 calls/mo, no card required) or Paid tier; only activate with real credentials |
 | Refunds through the provider | **IMPLEMENTED BUT NOT CONFIGURED** | Admin refund action calls the real Stripe refund API and records the provider reference; it refuses to run without credentials | Stripe onboarding (above); refunds never simulated |
+| Admin payment-method configuration (bKash/Nagad/bank/crypto/gateway) | **VERIFIED WORKING** (logic/tests) | New admin Payments page: create/edit/enable/disable/reorder/delete-with-typed-confirmation, per-kind field sets, every change audited (`payment_method.*` audit actions); 14 new tests incl. super-admin-only write policies | Runtime check needs the connected database; your real merchant numbers entered in the panel |
+| Customer manual-payment checkout (bKash/Nagad/bank/crypto) | **VERIFIED WORKING** (logic/tests) | Order page shows live admin-configured instructions (EN/BN), collects transaction ID + optional proof; crypto network-loss warning; reference format validated per method; order stays `pending_payment` until staff verify | Runtime check needs the connected database |
+| Manual payment verification + duplicate-reference protection | **VERIFIED WORKING** (logic/tests) | Database dedupe trigger: one live (kind, reference) pair platform-wide, case/whitespace-insensitive, backed by a unique constraint; admin queue approve/reject writes reviewer identity, timestamp, previous→new state, reason to the audit log | Runtime check needs the connected database |
+| Payment-proof storage (private) | **VERIFIED WORKING** (schema) | Private `payment-proofs` bucket; customer upload restricted to own `{customer}/…` folder by RLS; staff read via server-minted 2-minute signed URLs only; no public access; image/PDF ≤ 5 MB enforced client+server | Runtime check needs the connected database |
+| Customer self-approval prevention | **VERIFIED WORKING** (schema) | Database trigger: non-staff status change refused; `reviewed_by` must equal the acting authenticated staff id; decided rows must record reviewer + time; no delete policy exists at all | Runtime check needs the connected database |
 | WhatsApp / imo contact configuration | **VERIFIED WORKING** (logic) | Admin-editable, persisted, validated; links built in the official `wa.me` format (unit-tested); imo restricted to verified https profile URLs | A real business number/profile to enter in the admin panel |
-| Database (Supabase) | **BLOCKED** | Provisioning retested this run: identical pre-flight error `Missing required permission(s): organizations_read`; no Supabase variables exist in the runtime (checked by name only) | Workspace permission grant or project-ref binding — see §10 |
+| Database (Supabase) | **BLOCKED** | Provisioning retested earlier on 2026-10-12: pre-flight error `Missing required permission(s): organizations_read`; no Supabase variables exist in the runtime (checked by name only) | Workspace permission grant or project-ref binding — see §11 |
 | Email/password auth without verification | **IMPLEMENTED BUT NOT CONFIGURED** | Code path complete and previously reviewed; end-to-end test requires the database | Database connection |
 | Visa applications (guided, bilingual) | **VERIFIED WORKING** (schemas/logic) | 8 schema tests + full workflow invariants pass; every mutation Zod-validated | Runtime check needs the connected database |
 | Airline seat booking / auto-ticketing | **NOT IMPLEMENTED** (by design) | Nothing in the code claims to book or ticket; a confirmed-booking state exists only for a human-recorded provider PNR, and the DB trigger refuses the transition without one | Only if a real provider with production booking access is authorized later |
@@ -106,7 +112,7 @@ Schema (all idempotent, in `supabase/migrations/`):
   service-fee audit trigger, and a new `guard_application_transition` trigger enforcing valid
   workflow moves at the database layer (customers: draft→submitted only; decided states cannot
   silently reopen).
-- `0004_orders_flights_airports.sql` (new this run) —
+- `0004_orders_flights_airports.sql` —
   `airports` (maintained reference data; admin-correctable, deactivatable, never deleted),
   `service_orders` + `service_order_events` (append-only lifecycle audit),
   `order_price_snapshots` (immutable price snapshot per order; server-written),
@@ -115,6 +121,20 @@ Schema (all idempotent, in `supabase/migrations/`):
   trigger (orders born pending_payment only; payment verification only from the service
   context; confirmed bookings require a real provider reference), RLS on all new tables,
   and a public read policy limited to *active* service fees.
+- `0005_payment_methods.sql` (new this run) —
+  `payment_methods` (super-admin-only merchant configuration for bKash/Nagad/bank/crypto/
+  gateway; enabled rows are readable by authenticated customers so the checkout shows live
+  instructions; a CHECK rejects card-shaped digit runs so no raw card data can be stored),
+  `payment_submissions` (the customer manual-payment ledger: order, method, reference,
+  optional private proof, amount+currency snapshot; unique per method+reference), RLS
+  (owner-read; owner-insert only own pending rows; staff-update; no delete policy),
+  `guard_payment_submission_reference` dedupe trigger (one live reference platform-wide,
+  case/whitespace-insensitive), `guard_payment_submission_review` trigger (staff-only
+  status changes; `reviewed_by` pinned to the acting staff id; decided rows must record
+  reviewer and time; rows never deletable), `on_payment_submission_approved` trigger
+  (approval must match the order's immutable price snapshot and moves the order
+  pending_payment → payment_verified inside the same transaction — the money boundary),
+  and the private `payment-proofs` storage bucket scoped to owner folders + staff reads.
 - `supabase/seed/reference_data.sql` — 43 real countries, 9 categories, VisaBridge Global
   brand defaults, two draft reference listings with real official source URLs, verified and
   explicitly-unverified fee examples.
@@ -239,10 +259,18 @@ Implemented and statically verified:
    `bootstrap_first_super_admin` call → live checks. No VisaBridge Global source, migration,
    or data change is required or was made for this — the app already reads the four standard
    variables and is ready the moment they exist.
-2. Decide on payment activation: onboard the business with a payment provider (Stripe
-   Checkout is what the code implements), confirm merchant eligibility and per-transaction
-   costs, then provide `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` through the platform's
-   environment settings. The checkout, webhook, and refund paths activate with no code change.
+2. Decide on payment activation, in two independent parts:
+   - **Manual methods (zero cost, live after database connection):** open Admin → Payments,
+     add your real bKash/Nagad merchant numbers, bank account details, and/or a crypto
+     address + network, and enable them. Customers can then pay by those methods and submit
+     transaction IDs; your team verifies each against the actual account record in the same
+     panel (no bKash/Nagad API key or paid plan is involved — verification is manual by
+     design, so nothing is ever marked paid from a screenshot alone).
+   - **Card payments (paid, optional):** onboard the business with a payment provider
+     (Stripe Checkout is what the code implements), confirm merchant eligibility and
+     per-transaction costs, then provide `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
+     through the platform's environment settings. The hosted checkout, webhook, and refund
+     paths activate with no code change.
 3. Optional, when ready: Amadeus (live fares — free tier available) and Resend (email)
    accounts and their environment variables.
 

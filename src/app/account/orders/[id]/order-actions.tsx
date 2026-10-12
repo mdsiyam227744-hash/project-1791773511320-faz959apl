@@ -13,10 +13,12 @@ export function OrderActions({
   locale,
   orderId,
   payable,
+  cancellable = true,
 }: {
   locale: Locale;
   orderId: string;
   payable: boolean;
+  cancellable?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"pay" | "cancel" | null>(null);
@@ -89,7 +91,7 @@ export function OrderActions({
             {busy === "pay" ? t(locale, "common.loading") : t(locale, "orders.pay")}
           </button>
         ) : null}
-        {payable ? (
+        {cancellable ? (
           <button
             onClick={cancel}
             disabled={busy !== null}

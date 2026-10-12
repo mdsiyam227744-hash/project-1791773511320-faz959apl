@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { t, type Locale } from "@/lib/i18n";
 import { getAirportsByIds, type AirportRow } from "@/lib/airports";
 import { getOrderSnapshot, snapshotTotal, getOrderEvents, type OrderRow } from "@/lib/orders";
+import { listSubmissionsForOrder, listEnabledMethods, type PaymentSubmissionRow } from "@/lib/payment-methods";
 import { OrderStatusPill } from "@/components/order-status";
 import { OrderActions } from "./order-actions";
+import { ManualPaymentForm } from "./manual-payment-form";
 
 export const metadata = { title: "Service order — VisaBridge Global" };
 
@@ -21,10 +23,12 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
   const order = data as unknown as OrderRow | null;
   if (!order || order.customer_id !== user.id) notFound();
 
-  const [lines, events, airports] = await Promise.all([
+  const [lines, events, airports, submissions, methods] = await Promise.all([
     getOrderSnapshot(order.id),
     getOrderEvents(order.id),
     getAirportsByIds([order.origin_airport, order.destination_airport].filter((x): x is string => Boolean(x))),
+    listSubmissionsForOrder(order.id),
+    order.status === "pending_payment" ? listEnabledMethods() : Promise.resolve([]),
   ]);
   const airportMap = new Map(airports.map((a) => [a.id, a]));
   const { total, currency } = snapshotTotal(lines);
@@ -121,7 +125,67 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
 
       {order.status === "pending_payment" ? (
         <section className="rounded-xl border border-navy-100 bg-white p-4 md:p-6">
-          <OrderActions locale={locale} orderId={order.id} payable />
+          {submissions.some((s) => s.status === "pending_verification") ? (
+            <div>
+              <h2 className="text-sm font-semibold text-gold-900">
+                {locale === "bn" ? "যাচাই চলছে" : "Verification in progress"}
+              </h2>
+              <p className="mt-1 text-sm text-navy-600">
+                {locale === "bn"
+                  ? "আপনার পেমেন্ট তথ্য জমা হয়েছে। আমরা সত্যিকারের হিসাবের সাথে মিলিয়ে দেখছি — নিশ্চিত হলে এখানে দেখতে পাবেন। অতিরিক্ত কিছু পাঠাতে হবে না।"
+                  : "Your payment details are submitted. We are matching them against the actual account record — you'll see the confirmation here. Nothing further to send."}
+              </p>
+              <ul className="mt-3 space-y-1 text-xs text-navy-500">
+                {submissions
+                  .filter((s) => s.status === "pending_verification")
+                  .map((s) => (
+                    <li key={s.id} className="font-mono">
+                      {s.method_kind} · {s.submitted_reference} ·{" "}
+                      {new Date(s.created_at).toLocaleString(locale === "bn" ? "bn-BD" : "en-GB")}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ) : submissions.some((s) => s.status === "rejected") ? (
+            <div>
+              <h2 className="text-sm font-semibold text-red-800">
+                {locale === "bn" ? "পেমেন্ট যাচাই করা যায়নি" : "Payment could not be verified"}
+              </h2>
+              {submissions
+                .filter((s) => s.status === "rejected")
+                .map((s) => (
+                  <p key={s.id} className="mt-1 text-sm text-navy-600">
+                    {s.submitted_reference}
+                    {s.note ? ` — ${s.note}` : ""}
+                  </p>
+                ))}
+              <p className="mt-2 text-xs text-navy-500">
+                {locale === "bn"
+                  ? "সঠিক তথ্য দিয়ে আবার চেষ্টা করতে পারেন।"
+                  : "You can submit again with the correct details below."}
+              </p>
+              <div className="mt-4">
+                <ManualPaymentForm
+                  locale={locale}
+                  orderId={order.id}
+                  orderReference={order.reference_no}
+                  methods={methods}
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <ManualPaymentForm
+                locale={locale}
+                orderId={order.id}
+                orderReference={order.reference_no}
+                methods={methods}
+              />
+              <div className="mt-4 border-t border-navy-100 pt-4">
+                <OrderActions locale={locale} orderId={order.id} payable={false} />
+              </div>
+            </>
+          )}
         </section>
       ) : null}
 
