@@ -1,6 +1,6 @@
 # VisaBridge Global — Production-Readiness Report
 
-Date: 2026-10-12
+Date: 2026-10-12 (integration re-audit same day)
 Scope: this iteration's audit, repairs, rebrand, guided application flows, and verification of
 the existing International Visa Platform in this repository.
 
@@ -15,6 +15,19 @@ the existing International Visa Platform in this repository.
   environment contains no `NEXT_PUBLIC_SUPABASE_URL` / keys (verified by listing environment
   variable names — none exist). No substitute database or "Personal Access Token" was
   attempted: silently creating a different database would violate the audit rules.
+- **Integration re-audit (2026-10-12, this report):** the provisioning tool was invoked again
+  and returned the identical error, verbatim:
+  `{"message":"Missing required permission(s): organizations_read","error":{"missing_permissions":["organizations_read"]}}`.
+  The failure is deterministic and happens in the tool's pre-flight manifest check — before
+  any Supabase API call is made — so it is a workspace-level capability grant, not something
+  the project code can repair. **Least-privilege finding:** `organizations_read` grants the
+  ability to enumerate every organization the linked token can see and is only needed to
+  discover *which* Supabase project to bind. A least-privilege integration would bind this
+  project by explicit project ref instead, requiring no organization-level scope at all.
+  No source-code change was made for this: the application already consumes only the four
+  documented variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` — confirmed by inspection), so the moment the
+  platform injects them, no further code work is required.
 
 ## 2. Branding
 
@@ -143,11 +156,17 @@ Implemented and statically verified:
 
 ## 10. Outstanding blockers
 
-1. **No connected database.** The provisioning tool lacks the `organizations_read` permission
-   in this workspace, and no Supabase environment variables exist. Until a database is
-   connected, registration, login, applications, and admin editing cannot be exercised
-   end-to-end. This needs platform-side action (grant the permission or connect the project
-   database in settings); no user-pasted credentials are wanted or used.
+1. **No connected database — workspace permission gap, not a code defect.** The provisioning
+   tool's required-permission manifest demands `organizations_read`, which this workspace
+   cannot grant; the tool aborts in pre-flight before reaching Supabase (re-confirmed by an
+   actual retry on 2026-10-12, identical verbatim error). **Supported resolution** (either):
+   (a) grant the workspace's database-provisioning integration the `organizations_read`
+   scope, or (b) least-privilege alternative: bind the project's Supabase instance by
+   explicit project ref so no organization-level scope is needed, or connect the project
+   database in platform settings. Until one of these lands, registration, login,
+   applications, and admin editing cannot be exercised end-to-end. No user-pasted
+   credentials are wanted or used; a new/separate project will not be created as a
+   workaround.
 2. **No Amadeus / Stripe / Resend credentials.** The integrations are implemented against each
    provider's documented API and report unavailability honestly; they stay disabled until real
    accounts exist.
@@ -156,9 +175,13 @@ Implemented and statically verified:
 
 ## 11. Next actions (only what genuinely requires you)
 
-1. Connect the project database (platform settings or the provisioning permission). Everything
-   else follows mechanically: migrations → seed → register → one `bootstrap_first_super_admin`
-   call → live checks.
+1. Resolve the workspace permission so database provisioning can run: grant the integration
+   the `organizations_read` scope, or use the least-privilege alternative of binding the
+   existing project's Supabase instance by project ref / connecting the database in
+   settings. Everything else follows mechanically: migrations → seed → register → one
+   `bootstrap_first_super_admin` call → live checks. No VisaBridge Global source, migration,
+   or data change is required or was made for this — the app already reads the four standard
+   variables and is ready the moment they exist.
 2. Optional, when ready: Amadeus (live fares), Stripe (payments + webhook endpoint), Resend
    (email) accounts and their environment variables.
 
