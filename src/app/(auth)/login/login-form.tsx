@@ -10,7 +10,8 @@ const ERRORS: Record<string, string> = {
   missing: "Please fill in all fields.",
   invalid: "Incorrect email or password.",
   rate_limited: "Too many attempts — wait a minute and try again.",
-  db_unconfigured: "Account services are temporarily unavailable. Please try again later.",
+  db_unconfigured:
+    "Online sign-in is not available yet — our account system is being connected right now. You can already reach our team through the contact page or the WhatsApp button, and we will handle your request manually in the meantime.",
 };
 
 export default function LoginForm() {

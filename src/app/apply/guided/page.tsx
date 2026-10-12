@@ -50,8 +50,9 @@ export default async function GuidedApplyPage({
   if (!isSupabaseConfigured()) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
-        <p className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-          Applications are temporarily unavailable.
+        <p className="rounded-md bg-red-50 p-4 text-base text-red-700">
+          Online applications are not available yet — our account system is being connected. Please
+          contact our team and we will start your application manually in the meantime.
         </p>
       </div>
     );

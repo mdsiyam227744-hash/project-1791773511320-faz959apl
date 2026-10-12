@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { getBrand } from "@/lib/settings";
 import { t } from "@/lib/i18n";
 import { listCategories, listCountries, listVisaListings } from "@/lib/catalog";
-import { ContactButtons } from "@/components/brand";
 
 export const metadata: Metadata = {
   title: "Visa, Immigration & Travel Assistance",
@@ -53,9 +52,6 @@ export default async function HomePage() {
             >
               {t(locale, "cta.apply")}
             </Link>
-          </div>
-          <div className="mt-10">
-            <ContactButtons locale={locale} />
           </div>
         </div>
       </section>
@@ -134,6 +130,41 @@ export default async function HomePage() {
         <Link href="/process" className="mt-6 inline-block text-sm font-medium text-navy-700 underline">
           {t(locale, "common.viewAll")} — {t(locale, "process.title")}
         </Link>
+      </section>
+
+      {/* Trust, pricing approach, and support — factual only, nothing invented */}
+      <section className="bg-navy-50 py-14">
+        <div className="mx-auto max-w-6xl px-4">
+          <h2 className="text-2xl font-bold">Our commitments to you</h2>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {[
+              {
+                title: "Verified information only",
+                body: "Requirements, processing times, and official fees on this site carry their source and verification date. Anything we could not verify is labelled as such — we never present a guess as a fact.",
+              },
+              {
+                title: "Honest pricing",
+                body: "Our service fees are shown separately from government fees, before you pay anything. When a price is not yet confirmed, we say so instead of inventing an amount.",
+              },
+              {
+                title: "Real people, reachable",
+                body: "Every order gets a reference number and a named team member. Reach us through the contact buttons on this page or the contact form — we answer in English and Bangla.",
+              },
+            ].map((item) => (
+              <div key={item.title} className="rounded-xl border border-navy-100 bg-white p-5">
+                <h3 className="text-lg font-semibold">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-navy-700">{item.body}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-sm leading-relaxed text-navy-600">
+            VisaBridge Global is a private assistance service. We are not a government authority and
+            we do not issue visas or airline tickets ourselves — decisions always rest with the
+            embassies, consulates, and airlines. We charge only for our preparation, guidance, and
+            liaison work, and every paid service is covered by the refund policy published on this
+            site.
+          </p>
+        </div>
       </section>
     </>
   );

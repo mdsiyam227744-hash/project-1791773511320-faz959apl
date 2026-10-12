@@ -32,9 +32,33 @@
   --brand-secondary: #c9a227;
 }
 
+/*
+ * Readability baseline: 17px root (scales every rem-based size and Tailwind
+ * spacing uniformly), 16px+ on small phones, and a taller body line height.
+ * Mobile Safari zooms any input focused at < 16px, so form controls are pinned
+ * at 1rem minimum.
+ */
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (min-width: 480px) {
+  html {
+    font-size: 17px;
+  }
+}
+
 body {
   color: var(--color-navy-900);
   background: #ffffff;
+  line-height: 1.65;
+}
+
+input,
+select,
+textarea {
+  font-size: 1rem;
 }
 
 /* Focus visibility for keyboard users */
@@ -45,14 +69,22 @@ body {
 
 .prose-legal h2 {
   font-weight: 600;
-  font-size: 1.05rem;
-  margin-top: 1.25rem;
+  font-size: 1.35rem;
+  margin-top: 1.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.prose-legal h3 {
+  font-weight: 600;
+  font-size: 1.15rem;
+  margin-top: 1.4rem;
   margin-bottom: 0.5rem;
 }
 
 .prose-legal p,
 .prose-legal li {
-  color: #334;
-  margin-bottom: 0.5rem;
-  line-height: 1.6;
+  color: #263049;
+  margin-bottom: 0.65rem;
+  line-height: 1.7;
+  font-size: 1.05rem;
 }

@@ -113,6 +113,55 @@ export default async function AdminContent() {
             <span className="mb-1 block font-medium">imo button label</span>
             <input name="imo_button_label" defaultValue={contact.imoButtonLabel ?? ""} className={inputCls} />
           </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">
+              Facebook page URL (full https link to your official page)
+            </span>
+            <input
+              name="facebook_url"
+              type="url"
+              defaultValue={contact.facebookUrl ?? ""}
+              className={inputCls}
+              placeholder="https://facebook.com/your-page"
+            />
+          </label>
+          <fieldset className="rounded-md border border-navy-200 p-3">
+            <legend className="px-1 text-sm font-medium">Floating contact buttons</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="whatsapp_enabled"
+                  defaultChecked={contact.whatsappEnabled}
+                  className="h-4 w-4"
+                />
+                Show WhatsApp button
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="imo_enabled"
+                  defaultChecked={contact.imoEnabled}
+                  className="h-4 w-4"
+                />
+                Show imo button
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="facebook_enabled"
+                  defaultChecked={contact.facebookEnabled}
+                  className="h-4 w-4"
+                />
+                Show Facebook button
+              </label>
+            </div>
+            <p className="mt-2 text-xs text-navy-500">
+              Disabled buttons disappear from the website immediately. A button with no
+              destination configured (or a non-https Facebook URL) shows an honest
+              unavailable state rather than a wrong link.
+            </p>
+          </fieldset>
           <button className="rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white">
             Save contact channels
           </button>
@@ -121,14 +170,19 @@ export default async function AdminContent() {
         <div className="mt-4 rounded-md bg-navy-50 p-3 text-sm">
           <p className="font-medium">Current live result:</p>
           <p className="mt-1 text-xs text-navy-600">
-            WhatsApp button: {waPreview ? (
+            WhatsApp button: {waPreview && contact.whatsappEnabled ? (
               <a href={waPreview} target="_blank" rel="noopener noreferrer" className="underline break-all">{waPreview}</a>
-            ) : "hidden (number not configured)"}
+            ) : contact.whatsappEnabled ? "hidden (number not configured)" : "disabled"}
           </p>
           <p className="text-xs text-navy-600">
             imo button: {imoPreview ? (
               <a href={imoPreview} target="_blank" rel="noopener noreferrer" className="underline break-all">{imoPreview}</a>
             ) : "fallback notice shown"}
+          </p>
+          <p className="text-xs text-navy-600">
+            Facebook button: {contact.facebookUrl && contact.facebookEnabled ? (
+              <a href={contact.facebookUrl} target="_blank" rel="noopener noreferrer" className="underline break-all">{contact.facebookUrl}</a>
+            ) : contact.facebookEnabled ? "hidden (URL not configured)" : "disabled"}
           </p>
         </div>
       </section>

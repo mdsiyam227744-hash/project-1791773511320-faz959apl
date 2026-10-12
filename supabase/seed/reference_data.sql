@@ -152,3 +152,17 @@ select vl.id,'official_government','eVisa processing fee',20,'USD',false,
        'https://malaysiavisa.imi.gov.my/', null
 from public.visa_listings vl where vl.slug = 'bd-malaysia-evisa-tourist'
   and not exists (select 1 from public.visa_fees f where f.visa_listing_id = vl.id);
+
+-- ---------------------------------------------------------------------------
+-- Honest platform-status notices. The database_default row ships active: the
+-- seed only runs once a real database is connected, and at that moment the
+-- customer catalog is still empty until staff publish it — the banner says so
+-- truthfully and disappears the moment an administrator deactivates it.
+-- ---------------------------------------------------------------------------
+insert into public.page_notices (key, message_en, message_bn, severity, active)
+values
+  ('database_default',
+   'Our team is preparing the visa catalog right now. Every published requirement, fee, and processing time comes from the official source shown on its page — nothing is estimated silently. Please check back shortly or contact us for immediate assistance.',
+   'আমাদের টিম এই মুহূর্তে ভিসা ক্যাটালগ প্রস্তুত করছে। প্রকাশিত প্রতিটি শর্ত, ফি এবং প্রক্রিয়াকরণের সময় সংশ্লিষ্ট পৃষ্ঠায় দেখানো নির্ভরযোগ্য সরকারি সূত্র থেকে নেওয়া — কিছুই নিঃশব্দে অনুমান করা হয় না। অনুগ্রহ করে কিছুক্ষণ পর আবার দেখুন বা তাৎক্ষণিক সহায়তার জন্য আমাদের সাথে যোগাযোগ করুন।',
+   'info', true)
+on conflict (key) do nothing;

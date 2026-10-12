@@ -10,7 +10,8 @@ const ERRORS: Record<string, string> = {
   weak_password: "Password must be at least 10 characters and mix letters and numbers.",
   email_in_use: "An account with this email already exists.",
   rate_limited: "Too many attempts — wait a minute and try again.",
-  db_unconfigured: "Account services are temporarily unavailable. Please try again later.",
+  db_unconfigured:
+    "Online registration is not available yet — our account system is being connected right now. You can already reach our team through the contact page or the WhatsApp button, and we will set up your application manually in the meantime.",
   generic: "Registration failed. Please try again.",
 };
 

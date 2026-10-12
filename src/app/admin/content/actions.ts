@@ -48,6 +48,10 @@ const contactSchema = z.object({
   imo_button_label: z.string().trim().max(60).optional().or(z.literal("")),
   phone_display: z.string().trim().max(60).optional().or(z.literal("")),
   email_display: z.string().trim().email().optional().or(z.literal("")),
+  facebook_url: z.string().trim().max(300).optional().or(z.literal("")),
+  whatsapp_enabled: z.enum(["on"]).optional(),
+  imo_enabled: z.enum(["on"]).optional(),
+  facebook_enabled: z.enum(["on"]).optional(),
 });
 
 export async function updateContact(formData: FormData) {
@@ -67,6 +71,13 @@ export async function updateContact(formData: FormData) {
       imo_button_label: parsed.data.imo_button_label || null,
       phone_display: parsed.data.phone_display || null,
       email_display: parsed.data.email_display || null,
+      facebook_url:
+        parsed.data.facebook_url && parsed.data.facebook_url.startsWith("https://")
+          ? parsed.data.facebook_url
+          : null,
+      whatsapp_enabled: parsed.data.whatsapp_enabled === "on",
+      imo_enabled: parsed.data.imo_enabled === "on",
+      facebook_enabled: parsed.data.facebook_enabled === "on",
       updated_by: userId,
     })
     .eq("id", 1);

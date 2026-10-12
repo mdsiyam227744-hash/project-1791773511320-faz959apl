@@ -34,6 +34,10 @@ export interface ContactSettings {
   emailDisplay: string | null;
   whatsappButtonLabel: string | null;
   imoButtonLabel: string | null;
+  facebookUrl: string | null;
+  whatsappEnabled: boolean;
+  imoEnabled: boolean;
+  facebookEnabled: boolean;
 }
 
 const FALLBACK_CONTACT: ContactSettings = {
@@ -45,6 +49,10 @@ const FALLBACK_CONTACT: ContactSettings = {
   emailDisplay: null,
   whatsappButtonLabel: null,
   imoButtonLabel: null,
+  facebookUrl: null,
+  whatsappEnabled: true,
+  imoEnabled: true,
+  facebookEnabled: true,
 };
 
 export async function getBrand(): Promise<Brand> {
@@ -85,6 +93,10 @@ export async function getContact(): Promise<ContactSettings> {
       emailDisplay: data.email_display ?? null,
       whatsappButtonLabel: data.whatsapp_button_label ?? null,
       imoButtonLabel: data.imo_button_label ?? null,
+      facebookUrl: data.facebook_url ?? null,
+      whatsappEnabled: data.whatsapp_enabled !== false,
+      imoEnabled: data.imo_enabled !== false,
+      facebookEnabled: data.facebook_enabled !== false,
     };
   } catch {
     return FALLBACK_CONTACT;
@@ -107,6 +119,41 @@ export async function getLegal(docKey: string) {
       .eq("doc_key", docKey)
       .maybeSingle();
     return data;
+  } catch {
+    return null;
+  }
+}
+
+export interface PageNotice {
+  key: string;
+  messageEn: string;
+  messageBn: string;
+  severity: "info" | "warning";
+}
+
+/**
+ * Active site-wide notice (used for the honest "catalog being prepared"
+ * banner). Returns null when the database is unreachable — callers then show
+ * the standalone no-database notice instead.
+ */
+export async function getPageNotice(locale: Locale): Promise<PageNotice | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("page_notices")
+      .select("key, message_en, message_bn, severity")
+      .eq("active", true)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      key: data.key,
+      messageEn: data.message_en,
+      messageBn: data.message_bn,
+      severity: data.severity === "warning" ? "warning" : "info",
+    };
   } catch {
     return null;
   }

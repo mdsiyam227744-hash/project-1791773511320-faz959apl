@@ -1,7 +1,8 @@
 # VisaBridge Global — Production-Readiness Report
 
-Date: 2026-10-12 (admin-controlled payment methods iteration; integration re-audit; deployment/
-preview audit and no-database hardening, same day)
+Date: 2026-10-12 (full-platform repair pass: floating contact buttons, honest empty states,
+readability, admin contact controls; earlier same-day iterations: admin-controlled payment
+methods, integration re-audit, deployment/preview audit, no-database hardening)
 Scope: this iteration's audit, repairs, rebrand, guided application flows, flight booking
 assistance with the maintained airport directory, the service-order/payment lifecycle,
 administrator-configured payment methods with customer manual-payment checkout and staff
@@ -310,4 +311,53 @@ What was actually checked, inside this workspace:
 The things that matter most today — a live database, a repaired preview host, and a connected
 deployment integration — are all outside this container, and each is named with its exact owner
 and next action in §11 and §12.
+
+
+## 13. Full-platform repair pass (2026-10-12, this run)
+
+### 13.1 What the inspection found
+
+The user-visible problems have one shared root cause plus two real gaps:
+
+1. **Empty visa-category and country pages, hollow catalog sections, and the registration
+   error all trace to the absent database connection.** Every catalog function returns an
+   empty list when the Supabase variables are missing (by design — it never invents data),
+   so the pages render their honest-but-empty states, and `signUp` returns
+   `db_unconfigured`. The empty states were honest but *unhelpful*; see 13.2 for the fix.
+2. **Real gap: no Facebook button existed anywhere** — only WhatsApp and imo were
+   implemented.
+3. **Real gap: legal/body text was small and tight** (1.05 rem headings, 1.6 line height).
+
+### 13.2 Repairs implemented and verified this run
+
+| Item | Status | Evidence |
+|---|---|---|
+| Floating WhatsApp / imo / **Facebook** buttons on every public page | **IMPLEMENTED (awaiting database)** | New floating stack, bottom-right, all viewports, 44px targets; official brand-color icons with SVG-drawn Facebook and imo glyphs; configurable enable flags; honest contact-page fallback button when no channel is configured; replaces the old hero/footer inline buttons; migration `0006_social_links.sql` adds `facebook_url` + per-button switches to the existing settings row (no new table, existing RLS unchanged); admin Content page now configures, previews, and enables/disables all three |
+| Honest site-wide status banner | **IMPLEMENTED (awaiting database)** | When the database is absent, every public page shows a clear "services are being set up — the catalog is not available yet" banner; once connected, the banner text comes from the new `page_notices` table (migration `0007`, public read RLS, staff-controlled), seeded in English and Bangla; the footer states the limitation explicitly instead of showing an empty directory silently |
+| Registration/login error text | **FIXED** | "Account services are temporarily unavailable" replaced with honest, actionable text on both forms (what is unavailable, what to do now: contact page / WhatsApp) — the previous wording implied a transient outage on the customer's side |
+| Readability | **FIXED (verified in code)** | 16px base on phones, 17px from 480px up (scales the whole spacing system); body line-height 1.65; legal text 1.05 rem → larger, darker, 1.7 line-height; form controls pinned at ≥16px so mobile browsers cannot zoom on focus; category/detail/apply pages bumped from `text-xs`/`text-sm` metadata to readable sizes |
+| Empty category pages now act as useful pages | **FIXED** | Each visa category explains what it covers, gives category-specific guidance (work, student, business, family, transit, medical each say what to send us), and offers working "Start an application" / contact buttons that deep-link into the matching guided form; listing cards gained View-details + Apply actions |
+| Empty country directory | **FIXED** | Instead of a bare "no results", the page names the major corridors the team actually serves and offers "Ask about your destination" and category links |
+| Homepage trust/pricing/support section | **ADDED** | Factual commitments (verified-information-only, honest pricing, real people) plus the private-assistance disclaimer: no invented licenses, partnerships, or testimonials |
+| Application-flow empty state | **FIXED** | The guided application page explains the situation and offers the contact path instead of a bare red box |
+
+Verification this run: `pnpm exec tsc --noEmit` → **0 errors**; `pnpm test` → **68/68 pass**
+(includes the SQL-invariant tests covering RLS, the payment boundary, price snapshots, and the
+seed's honesty rules — the new migrations follow the same policy pattern as the existing five).
+The database provisioning path was **not** retried again this run: the failure is deterministic
+(§11), nothing about the cause changed, and the user instruction and good practice both say not
+to repeat an unchanged failing action.
+
+### 13.3 What remains outside this workspace (unchanged owners)
+
+1. **Database connection** — §11 still governs: workspace `organizations_read` grant, project-ref
+   binding, or connect-in-settings. When it lands: apply migrations 0001–0007 in order, then
+   `reference_data.sql` and `airports.sql`, and every section above flips from "awaiting
+   database" to verifiable at runtime.
+2. **Preview host** — Massvai Support (§12).
+3. **Deployment integration** — platform Vercel connection + the four environment variables
+   (§12 checklist).
+4. **Your real business details** — WhatsApp number, imo profile link, and Facebook page URL
+   entered in Admin → Content & branding after the database is connected; the three floating
+   buttons go live with them.
 

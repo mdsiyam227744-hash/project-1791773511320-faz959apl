@@ -26,9 +26,28 @@ export default async function CountriesPage() {
       </p>
 
       {countries.length === 0 ? (
-        <p className="mt-8 rounded-lg border border-navy-100 bg-navy-50 p-6 text-navy-700">
-          {t(locale, "common.noResults")}
-        </p>
+        <div className="mt-8 rounded-lg border border-navy-100 bg-navy-50 p-6">
+          <p className="text-base leading-relaxed text-navy-700">
+            The country directory is being prepared right now. Our team already assists with the
+            major destinations — for Bangladeshi and South Asian passport holders these include
+            Thailand, Malaysia, Singapore, the United Arab Emirates, Saudi Arabia, Qatar, the
+            United Kingdom, the United States, Canada, Australia, and Japan, among others.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/contact"
+              className="rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+            >
+              Ask about your destination
+            </Link>
+            <Link
+              href="/visa-categories"
+              className="rounded-md border border-navy-200 px-4 py-2.5 text-sm font-semibold text-navy-700 hover:bg-navy-50"
+            >
+              {t(locale, "nav.visas")}
+            </Link>
+          </div>
+        </div>
       ) : (
         [...byRegion.entries()].sort().map(([region, list]) => (
           <section key={region} className="mt-8">
