@@ -1,23 +1,23 @@
 # Deployment Verification Report — VisaBridge Global
 
-Prepared: 2026-10-13 · Scope: repository-to-production delivery chain for the
-three local commits from the aviation reference data pass. This report exists
-so that no one — including future sessions — can mistake "code and tests pass"
-for "deployed and serving".
+Prepared: 2026-10-13 · Scope: repository-to-production delivery chain. This report
+exists so that no one — including future sessions — can mistake "code and tests
+pass" for "deployed and serving". Revision 2 (later the same day): covers the
+Vercel production build failure on `/login` and the fix commit `36d4f5f`.
 
 ## 1. State of the delivery chain (one page)
 
 | Stage | State | Evidence and exact blocker |
 |---|---|---|
-| Local repository | **DONE — verified** | Clean tree at `216d2cb8982e271f1cb15ebbe76e6b0acca037bd` (2026-10-13). `git status` clean, 0 modified files. |
-| Type check | **DONE — verified** | `pnpm exec tsc --noEmit` → 0 errors (final pass before this report). |
-| Unit/integration tests | **DONE — verified** | 99/99 passing (78 baseline + 21 from the aviation pass). |
-| Production build | **BLOCKED (platform policy)** | Build/dev commands are refused in this environment by design; the build gate runs on deploy. Not executed locally — never report it as passed. |
-| Git push to GitHub | **BLOCKED (credentials)** | Remote readable, push unauthorized — details in §2. |
-| GitHub remote commit | **BLOCKED (same)** | Remote `main` still at `4689d8c639692859c2b7b41befbeabfcdf80aae5`; the 3 newer commits have not landed remotely. |
-| Vercel build | **NOT STARTED** | No deployment can be triggered because the source never reached GitHub. Secondary: no Vercel token in this runtime (verified by env-name listing), so the API is 403-unauthenticated from here. |
+| Local repository | **DONE — verified** | Clean tree at `36d4f5f` (build-fix commit; parent `9b071b8…` = fare-matrix pass). `git status` clean, 0 modified files. |
+| Type check | **DONE — verified** | `pnpm exec tsc --noEmit` → 0 errors (re-run after the build fix). |
+| Unit/integration tests | **DONE — verified** | 129/129 passing (re-run after the build fix). |
+| Production build | **FIX IN CODE, AWAITING VERCEL LOG** | Vercel 15.5.19 failed prerendering `/(auth)/login` — `useSearchParams()` without a Suspense boundary. Root cause found in `src/app/(auth)/login/login-form.tsx`, canonical fix applied in commit `36d4f5f` (server page wraps the client form in `<Suspense>`). Local build runs are refused by platform policy, so the confirming evidence must be the Vercel build log after the fix lands. |
+| Git push to GitHub | **BLOCKED (credentials)** | Attempted again this run via `git push origin main`; failed unauthenticated — details in §2. |
+| GitHub remote commit | **PARTIALLY SYNCED** | Platform git service caught up between sessions: `git ls-remote` now shows `refs/heads/main` = `9b071b8515d7f0efb24d6b946e91f52018c6b36c` (fare-matrix pass). Only the newer fix commit `36d4f5f` is local-only. |
+| Vercel build | **FAILED → REDEPLOY PENDING** | Confirmed error: `Error: useSearchParams() should be wrapped in a suspense boundary at page "/login"` (Next.js 15.5.19, static prerender of `/(auth)/login/page`). Fix is the commit above; next push to `main` triggers the rebuild. |
 | Production URL serving | **NOT APPLICABLE YET** | No vercel.app URL is recorded anywhere in the repo; production is defined by the connected Vercel project `prj_tRFQTAl4X8jXW8Zc4Rlregw2gp48`. |
-| Database connectivity | **BLOCKED (platform-side)** | Retried through the platform's own provisioning tool this run; real error in §3. |
+| Database connectivity | **BLOCKED (platform-side)** | Provisioning tool invoked again this run; identical error, word for word — §3. |
 | Auth/persistence verification | **NOT STARTED** | Cannot start without a database. |
 | Live flight provider | **NOT CONFIGURED (by design)** | No `AMADEUS_CLIENT_ID`/`AMADEUS_CLIENT_SECRET` in the runtime (verified by env-name listing). Setup: §4 of `docs/OPERATIONS-CHECKLISTS.md`. |
 
@@ -39,16 +39,24 @@ credentials.
    `~/.git-credentials`, no SSH keys. The push grant lives with the platform's
    connected GitHub service, which is not an invocable tool in this run.
 
-**Conclusion:** every local prerequisite for the push is satisfied and the push
-is a clean fast-forward (no divergence, nothing to rebase or overwrite —
-`git push` with no force flags). It requires an actor that holds the GitHub
-write credential: the platform's git service, or a one-time
-`git push origin main` from any session where that credential is mounted.
+**Conclusion (revision 2):** the push remains a clean fast-forward — the remote
+tip the platform synced equals the local parent of the fix commit — and the
+command was attempted again this run, failing identically unauthenticated. The
+platform's git service demonstrably synced all six prior commits between
+sessions (it reached `9b071b8`); the same channel is expected to carry
+`36d4f5f`. It requires an actor that holds the GitHub write credential: the
+platform's git service, or a one-time `git push origin main` from any session
+where that credential is mounted. Nothing is force-pushed; the remote has no
+commits to overwrite.
 
 **Definition of done (tick when verified, not assumed):**
 
-- [ ] `git ls-remote origin` shows `refs/heads/main` =
-      `216d2cb8982e271f1cb15ebbe76e6b0acca037bd`.
+- [x] `git ls-remote origin` shows `refs/heads/main` =
+      `9b071b8515d7f0efb24d6b946e91f52018c6b36c` (verified this run — the six
+      earlier commits are on GitHub).
+- [ ] `git ls-remote origin` shows `refs/heads/main` = the fix commit
+      `36d4f5f…` (the next platform git sync should close this; verify, never
+      assume).
 - [ ] GitHub → Vercel integration auto-triggers a build (or a manual "Deploy"
       from the `main` branch in the Vercel dashboard).
 
@@ -62,11 +70,15 @@ this run:
 
 This is more precise than the historical pre-flight `organizations_read`
 failure and points at the same place: **account state on the platform's
-Supabase integration**. The account the integration uses has no organization,
-and organizations cannot be created from project tooling. This is not a code
-problem and cannot be repaired from the repository — every migration
-(`0001`–`0008`), policy, and seed file is already in the repo and applies
-unchanged the moment a database is bound.
+Supabase integration**. Revision 2 re-invoked the platform provisioning tool
+after the build fix landed and received **the identical sentence, word for
+word** — not a permissions escalation, still an empty-organization condition.
+The account the integration uses has no organization, and organizations cannot
+be created from project tooling. This is not a code problem and cannot be
+repaired from the repository — every migration (`0001`–`0009`), policy, and
+seed file (including the fare-matrix seeds, which import into `needs_review`
+status by design) is already in the repo and applies unchanged the moment a
+database is bound.
 
 **Required action (outside this container):** in the Massvai platform's
 database integration settings, either create/select an organization on the
@@ -102,8 +114,10 @@ environment; then apply migrations in order and run the connection test in §5.
 
 ## 5. Residual risks to carry forward
 
-- The three commits exist **only locally** until the push in §2 happens; any
-  future session must re-check `git ls-remote` before assuming sync.
+- The build-fix commit `36d4f5f` exists **only locally** until the next
+  platform git sync (all six earlier commits are confirmed on GitHub as of
+  revision 2); any future session must re-check `git ls-remote` before
+  assuming sync.
 - The first migration application against a fresh database is still
   unexercised end-to-end; treat the §4.3 check as the acceptance gate, and
   keep the honest "database not connected" states until it passes.
