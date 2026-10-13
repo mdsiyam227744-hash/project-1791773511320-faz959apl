@@ -1,0 +1,3 @@
+ident,name,iso_country,latitude,longitude,iata_code,icao_code,city_municipality,iso_region,airport_type,scheduled_service
+ZZ_EXAMPLE,Example International Airport,BD,23.810300,90.412500,ZZA,VGZZ,Example City,BD-C,large_airport,yes
+ZZExample-DOM,Example Domestic airstrip (EXAMPLE ROW — DO NOT IMPORT),BD,22.356900,91.783200,,,VGXD,Example South,BD-C,small_airport,no

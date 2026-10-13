@@ -144,6 +144,68 @@ test host by default, production host after activation). Until then the search b
 disabled with an honest notice and the assistance-request path remains the real workflow.
 Airport autocomplete additionally requires the connected database (see §1.1 blocker).
 
+## 1.2b Aviation reference data foundation (2026-10-13, this pass)
+
+Scope: Parts A–D + G + H + I of the aviation-data mission. Everything below is
+code-verified this run (strict `tsc` clean, 99/99 tests pass, dev server boots
+3.6 s); database-dependent behavior activates automatically when the platform
+connection lands.
+
+**Shipped:**
+- **Airport dataset regenerated with provenance:** 86,240 rows from the live
+  OurAirports public-domain dataset (`node scripts/load-airports.mjs 2026-10-13`),
+  now keeping every airport type (including heliports/closed, marked as such),
+  scheduled-service flag, ISO region, municipality, home/wikipedia links,
+  the dataset's own id (`source_ident`), and the dataset version. Structural
+  SQL checks pass (86,240 tuples, balanced parens, idempotent upsert). The
+  upsert writes source fields only — admin verification state can never be
+  overwritten by a re-import (enforced in the seed and by a DB trigger).
+- **Migration 0008** (`supabase/migrations/0008_aviation_reference.sql`):
+  `airlines`, `airline_routes`, `fare_observations`, `service_corridors`,
+  `preferred_airports`, `visa_packages`, `airport_distance_cache`,
+  `airport_import_batches`, plus airport verification/merge columns. RLS on
+  all eight new tables; unverified routes, draft fares, and unpublished
+  packages are invisible to the public; route→current/seasonal and fare→
+  published transitions are refused by triggers unless reviewer identity +
+  timestamp are recorded; negative fares and self-routes are schema-level
+  impossible.
+- **Distance system:** on-demand haversine between airport coordinates with
+  documented Earth radius (6,371.0088 km), cached canonically (A→B and B→A
+  share one row), symmetry unit-tested, missing coordinates → explicit
+  no-distance response (never a fabricated number). New public
+  airport-pair tool and country-pair explanation.
+- **Two separated fare systems:** the live provider path (unchanged, needs
+  credentials) and the new admin-maintained indicative fare references with
+  full provenance, draft→review→publish workflow, automatic expiry (validity
+  date or 90 days), and honest display states (live quote / indicative /
+  pending / expired / none).
+- **New admin panel sections:** Airports (verify/reject/reset, corrections,
+  merge duplicates, CSV import with preview + validation report + explicit
+  commit, CSV export), Airlines, Routes (evidence-source required), Fare
+  references, Corridors + preferred airports, Visa packages (government fee
+  vs service fee split, verification requires source URL). All guarded by
+  `requireStaff` roles and audited with actor + before/after.
+- **New public pages:** airport directory (search + country/type filters),
+  airport detail (provenance, verification, not-bookable notice, verified
+  routes only), distance tool; nav links added in EN/BN.
+- **Agent documentation:** `docs/DATA-OPERATIONS.md` (full manual with
+  workflow rules) and `docs/templates/airports-import-template.csv` +
+  README (example row clearly marked, invalid-row example shown).
+- **Tests:** 19 new tests (code validators, coordinate ranges incl. antimeridian,
+  fare state machine + expiry, route visibility, CSV parser incl. unterminated
+  quotes, import-row validation, package fee separation, migration-0008
+  invariants). Suite total now 99.
+
+**Verified numbers (current state):** 86,240 airport records in the seed
+(source: OurAirports, downloaded 2026-10-13; 9,051 carry IATA codes; 0 with
+missing coordinates); 0 verified routes/airlines/fare observations yet —
+those populate through the admin workflows above; distances computed on
+demand (not pre-generated as a quadratic table).
+
+**Externally unchanged:** live flight quotes still await Amadeus credentials;
+every database-backed runtime check still awaits the Supabase provisioning
+connection (§1.1). No blocker was retried this pass.
+
 ## 2. Branding
 
 - Platform name default: **VisaBridge Global**. Tagline: **Your Journey. Our Guidance.**
@@ -295,9 +357,10 @@ Implemented and statically verified:
 | Check | Command | Result |
 |---|---|---|
 | TypeScript (strict) | `pnpm exec tsc --noEmit` | **0 errors** (re-run after every change this iteration) |
-| Unit + schema tests | `pnpm test` | **47/47 pass** (18 core — incl. price-math, mixed-currency rejection, webhook forgery, order-transition invariants; 21 SQL/security invariants incl. the new migration's guard triggers and RLS coverage; 8 form schemas) |
-| Migration SQL lint | balance/guard scans in the invariant suite | **pass** (0004 included: every CREATE guarded, triggers preceded by drop-if-exists, dollar-quotes balanced) |
-| Airport dataset build | `node scripts/load-airports.mjs` | **pass** — live download, 9,763 rows, valid SQL header/values verified |
+| Unit + schema tests | `pnpm test` | **99/99 pass** (core price/webhook/transition invariants, SQL/security invariants across all migrations, form schemas, flight-search validation, and the 19 new reference-data tests: validators, coordinate ranges, fare lifecycle/expiry, CSV parsing, import-row validation, package fee separation, migration-0008 invariants) |
+| Migration SQL lint | balance/guard scans in the invariant suite | **pass** (0008 included: every CREATE guarded, triggers preceded by drop-if-exists, dollar-quotes balanced, RLS on all 8 new tables) |
+| Airport dataset build | `node scripts/load-airports.mjs 2026-10-13` | **pass** — live download, 86,240 rows with provenance columns, balanced SQL verified |
+| Dev-server boot | compile-only boot check, killed after start | **pass** (Next.js 15.5.19 ready in 3.6 s) |
 | Production build | `next build` | **not run** — build/dev commands are blocked in this environment by platform policy |
 | Rendered-page checks | HTTP against the preview | **not possible** — the preview server is not reachable from the execution container |
 | Lint | `next lint` | not run (config absent in the project; the command exits to an interactive setup prompt) |
@@ -333,13 +396,20 @@ Implemented and statically verified:
 
 ## 11. Next actions (only what genuinely requires you)
 
+0. **Populate the reference data through the new admin workflows** (after the database
+   connects): verify priority airports, add the airlines you actually sell, record routes
+   with evidence URLs, and enter indicative fare observations per the manual
+   (`docs/DATA-OPERATIONS.md`). The public airport directory, distance tool, and package
+   system show real data as soon as the corresponding records are approved/published —
+   until then they show honest empty states. Live flight quotes additionally need the
+   Amadeus credentials (below).
 1. Resolve the workspace permission so database provisioning can run: grant the integration
    the `organizations_read` scope, or use the least-privilege alternative of binding the
    existing project's Supabase instance by project ref / connecting the database in
-   settings. Everything else follows mechanically: migrations → seed → register → one
-   `bootstrap_first_super_admin` call → live checks. No VisaBridge Global source, migration,
-   or data change is required or was made for this — the app already reads the four standard
-   variables and is ready the moment they exist.
+   settings. Everything else follows mechanically: migrations (now 0001–0008) → seeds →
+   register → one `bootstrap_first_super_admin` call → live checks. No VisaBridge Global
+   source or migration change is required for this — the app already reads the four
+   standard variables and is ready the moment they exist.
 2. Decide on payment activation, in two independent parts:
    - **Manual methods (zero cost, live after database connection):** open Admin → Payments,
      add your real bKash/Nagad merchant numbers, bank account details, and/or a crypto
