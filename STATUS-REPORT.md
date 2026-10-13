@@ -582,3 +582,47 @@ pass, the newest being `216d2cb8982e271f1cb15ebbe76e6b0acca037bd`). Nothing in
 this pass changed application behavior — the honest not-connected/not-configured states are the
 correct production behavior until the external owners close §15.1.
 
+## 16. Worldwide fare-matrix pass (2026-10-13, latest)
+
+Real, source-backed fare observations replaced the empty state of the fare system: the published
+**flight-fare-history** dataset (CC-BY-4.0, source piratefly.com, collected continuously since
+2026-06-14, one-way ADVERTISED fares in EUR, updated daily) was downloaded, validated against its
+documented schema, and mapped through the airport database into a worldwide country-pair fare
+reference system that administrators now operate without code changes.
+
+### 16.1 What was built
+
+| Deliverable | State | Evidence |
+|---|---|---|
+| Dataset download + validation | **DONE (local)** | `routes.csv` (55,745 route rows) + `fares-by-month.csv` (112,426 rows) fetched from Hugging Face; README verified (license `cc-by-4.0`, one-way advertised EUR, daily updates, DOI on Zenodo). Files committed under `supabase/data/flight-fare-history/`. |
+| City→country mapping | **DONE (local)** | 2,218 distinct dataset city names matched against 81,476 airport rows (38,653 normalised names). 22,681 international city routes uniquely mapped; **446 ambiguous/unmatched city names queued for human resolution** (e.g. `Abbotsford → CA,US`, `Adelaide → AU,ZA`, `Agadir → unmatched`) — never guessed. |
+| Country-pair aggregation | **DONE (local)** | 4,898 ordered country pairs with observed one-way references (lowest observed route + that route's own median + observation counts + window), 1,702 derived round-trip references (sum of two directional one-way medians, labelled derived, never an observed return). 3,308 domestic city routes excluded. |
+| Matrix data model | **DONE (migration 0009, awaiting DB)** | `country_fare_refs` (needs_research rows structurally cannot carry an amount), `derived_round_trip_refs`, `fare_mapping_review`, `fare_display_settings`; RLS on all four; review decisions require reviewer identity+time (trigger-enforced); import refreshes preserve admin decisions. |
+| Worldwide pair generation | **DONE (code)** | `generateCountryPairs()` enumerates ordered pairs from the countries table on demand — no quadratic materialisation; DB function `country_pair_matrix_size()` for honest reporting. |
+| Admin panel — Country fare matrix | **DONE (local)** | `/admin/fare-matrix`: coverage counters (all from stored records), review queue (verify/reject/reopen), derived-refs review, city-name resolution, planning estimates (stored separately from observed amounts, never shown as fares), display-currency settings (documented rate + date shown publicly), CSV import (validate → needs_review only; verified rows never overwritten), CSV export. Server-side role checks + audit logging on every mutation. |
+| Public fare directory | **DONE (local)** | `/flights/fares`: verified-only rows (enforced by RLS), observation window + source + license per row, derived table labelled as derived, "awaiting research" pairs shown as pairs WITHOUT prices, honest empty states when nothing is verified yet. Linked from the flight search page. |
+| Agent tooling | **DONE (local)** | `docs/templates/fare-matrix-import-template.csv` + README with column definitions, validation rules, and clearly-marked example rows. |
+| Tests | **DONE — 129/129 pass** | 30 new tests: matrix generation/dedup, five honest display states, conversion rounding, CSV row validation (amounts/dates/sources/domestic/rejected shapes), export escaping, city normalisation/aliases/ambiguity, aggregation + derived rules, loader↔library parity, generated-seed sanity, migration-0009 invariants (shape constraints, reviewer-identity triggers, import guard, RLS, idempotence). `pnpm exec tsc --noEmit` → 0 errors. |
+
+### 16.2 What did NOT happen (unchanged blockers)
+
+- **Database persistence: NO.** Supabase provisioning is still blocked platform-side
+  (§15.1). Migration 0009 and the generated seed (`supabase/seed/country_fare_refs.sql`,
+  ~1.79 MB: 4,898 + 1,702 + 446 rows + needs_research markers + display settings) are ready to
+  apply the moment provisioning lands — until then **no fare record has been saved to any
+  database**, and the public page correctly shows the not-connected state.
+- **Review/publish: NOT STARTED.** Every imported reference is `needs_review` by design; the
+  4,898 observations become customer-visible only after an authorised reviewer verifies them in
+  the admin panel. The honest coverage numbers once the DB exists: verified=0 until a human says so.
+- **Live quotes / Amadeus: NOT CONFIGURED** (unchanged, §15.1).
+- **Push/deploy: BLOCKED** (unchanged, §15.1) — this pass adds a sixth unpushed commit.
+
+### 16.3 What the dataset does and does not claim
+
+The amounts are HISTORICAL OBSERVED one-way advertised fares in EUR over a documented window
+(first observations 2026-06-14, last 2026-10-13). They are not today's prices, not quotes, not
+availability. Return figures are derived sums of medians and are labelled as such everywhere.
+Country-level values name the exact city route that produced them. The worldwide matrix is a
+management frame: pairs without credible data are marked needs_research and displayed with NO
+amount rather than an invented one.
+

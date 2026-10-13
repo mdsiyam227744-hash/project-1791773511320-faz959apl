@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-10-13T06:42:58.355Z",
+  "dataset": "https://huggingface.co/datasets/DeusHorizon/flight-fare-history",
+  "license": "CC-BY-4.0",
+  "dataset_rows": 55746,
+  "uniquely_matched_international_city_routes": 22681,
+  "domestic_routes_skipped": 3308,
+  "city_names_in_review_queue": 446,
+  "country_pairs_with_observed_one_way": 4898,
+  "derived_round_trip_references": 1702,
+  "needs_research_markers": "inserted at SQL level for pairs within the observed country universe",
+  "note": "amounts are historical EUR one-way observations; the derived values are sums of medians, not observed returns"
+}

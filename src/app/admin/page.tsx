@@ -22,6 +22,8 @@ export default async function AdminOverview() {
     activeJobs,
     confirmedPayments,
     newConsults,
+    faresAwaitingReview,
+    citiesToResolve,
   ] = await Promise.all([
     count(supabase, "profiles"),
     count(supabase, "applications", { status: "submitted" }),
@@ -31,6 +33,8 @@ export default async function AdminOverview() {
     count(supabase, "job_listings", { status: "approved" }),
     count(supabase, "payment_transactions", { status: "confirmed" }),
     count(supabase, "consultation_requests", { status: "new" }),
+    count(supabase, "country_fare_refs", { verification_status: "needs_review" }),
+    count(supabase, "fare_mapping_review", { resolved: "false" }),
   ]);
 
   const stats = [
@@ -42,6 +46,8 @@ export default async function AdminOverview() {
     { label: "Active job listings", value: activeJobs, href: "/admin/jobs" },
     { label: "Confirmed payments", value: confirmedPayments, href: "/admin/fees" },
     { label: "New consultations", value: newConsults, href: "/admin/consultations" },
+    { label: "Fare references awaiting review", value: faresAwaitingReview, href: "/admin/fare-matrix" },
+    { label: "City names to resolve", value: citiesToResolve, href: "/admin/fare-matrix" },
   ];
 
   return (

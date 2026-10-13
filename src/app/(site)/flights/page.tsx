@@ -67,6 +67,14 @@ export default async function FlightsPage() {
           </Link>
         </p>
       ) : null}
+
+      <p className="mt-4 text-sm text-navy-500">
+        Wondering what a route usually costs? Browse our reviewed{" "}
+        <Link href="/flights/fares" className="font-medium underline">
+          worldwide fare references
+        </Link>{" "}
+        — historical observed prices with their sources, clearly not bookable quotes.
+      </p>
     </div>
   );
 }

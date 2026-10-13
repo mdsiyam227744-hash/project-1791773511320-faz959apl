@@ -1,0 +1,3 @@
+origin_iso,destination_iso,one_way_eur,return_eur,lowest_city_pair,observation_from,observation_to,observation_count,source_url,source_license
+ZZ,QQ,123.45,,Example City → Other Example (EXAMPLE ROW — DELETE BEFORE IMPORT),2026-09-01,2026-10-01,42,https://example.org/observation,CC-BY-4.0
+QQ,ZZ,,210.00,Other Example → Example City derived from two one-way medians (EXAMPLE ROW — DELETE BEFORE IMPORT),2026-09-01,2026-10-01,,https://example.org/observation,CC-BY-4.0
