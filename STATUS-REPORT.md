@@ -542,3 +542,42 @@ live results, database connection for airport autocomplete — same owners as §
    entered in Admin → Content & branding after the database is connected; the three floating
    buttons go live with them.
 
+---
+
+## 15. Delivery-state pass (2026-10-13, latest)
+
+Objective: push the three local commits, resolve the Supabase blocker, and separate every
+delivery state. Full detail: **[Deployment Verification Report](docs/DEPLOYMENT-VERIFICATION.md)**;
+operational handover: **[Operations Checklists](docs/OPERATIONS-CHECKLISTS.md)**.
+
+### 15.1 What was actually attempted and what happened
+
+| Task | Result | Evidence |
+|---|---|---|
+| Push 3 commits to GitHub | **BLOCKED (credentials)** | `git ls-remote origin` succeeds (`4689d8c6…` = remote `main`, so the push is a clean fast-forward with nothing to rebase), but `git push` fails: `could not read Username for 'https://github.com'`. No helper, no token variable (name-checked), no `.netrc`/credentials file/SSH key in the container; the GitHub service write grant is not an invocable tool in this run. Needs the platform's git service or one push from a credentialed session. |
+| Supabase provisioning | **BLOCKED (retested via the platform tool)** | The provisioning capability returned a new, precise error this run: **"The configured Supabase account has no organization to create a project in"** — account state on the platform side; organizations cannot be created from project tooling. All migrations (0001–0008) and seeds sit ready in `supabase/migrations` + `supabase/seed`. Owner: platform database-integration settings (create/select an organization or re-link an account that has one), then Support if not self-service. |
+| Vercel build/URL check | **NOT STARTED** (depends on the push) | No Vercel token in this runtime (name-checked; API 403 unauthenticated); no production URL recorded in the repo. Dashboard steps: `DEPLOYMENT-VERIFICATION.md` §4. |
+| Runtime variables | **NONE PRESENT** (name-checked) | No `SUPABASE_*`/`DATABASE_URL`/`VERCEL_*`/`AMADEUS_*`/`STRIPE_*` variables exist in this environment — consistent with all states above. |
+
+### 15.2 New documentation deliverables
+
+- **[Deployment Verification Report](docs/DEPLOYMENT-VERIFICATION.md)** — the full chain
+  (local → typecheck → tests → build → push → GitHub → Vercel → production → database →
+  auth/persistence) with each stage in exactly one of: DONE-verified / BLOCKED (named owner) /
+  NOT STARTED / NOT CONFIGURED, plus definition-of-done checklists for the push, the database
+  binding, and six post-deploy verification steps (build log, production URL, live-DB probe via
+  `/countries`, auth round-trip, persistence round-trip, environment variables).
+- **[Operations Checklists](docs/OPERATIONS-CHECKLISTS.md)** — exact Amadeus authorization
+  steps (Self-Service tier, `AMADEUS_CLIENT_ID`/`AMADEUS_CLIENT_SECRET`, test-host default and
+  the explicit `AMADEUS_HOSTNAME=api.amadeus.com` production switch, real verification search,
+  kill-switch), the first verified airline route (evidence URL + independent second-person
+  approval), the first fare observation, the first destination-specific visa package with the
+  government-fee source rule, and a first-work-day order.
+
+### 15.3 Verification performed before this report
+
+`pnpm exec tsc --noEmit` → **0 errors**; `pnpm test` → **99/99 pass**. The tree is clean at
+`216d2cb8982e271f1cb15ebbe76e6b0acca037bd` with the two new docs committed on top. Nothing in
+this pass changed application behavior — the honest not-connected/not-configured states are the
+correct production behavior until the external owners close §15.1.
+
