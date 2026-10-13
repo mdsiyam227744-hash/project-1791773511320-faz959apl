@@ -9,17 +9,26 @@ source** — the configured Management API token authenticates successfully and
 its account owns zero organizations (§3.1). The push was re-attempted after
 re-verifying ancestry and failed with the identical credential error (§2);
 local HEAD is now `b571429` (docs-only) on top of the fix.
+Revision 4 (same day, latest): **GitHub sync is COMPLETE.** `git ls-remote` and
+a verified fetch both read `refs/heads/main` = `ece9993…`, and an ancestry
+check proves the login fix `36d4f5f` is contained in the pushed history — the
+platform git service carried all three formerly local commits. Supabase was
+re-probed with a focused script: organizations still `200 []`, projects still
+`403 missing projects_read`, auth layer still passes — conclusion unchanged.
+The dev preview was **not reachable** from the execution container this session
+(all candidate addresses refused), so runtime routes were not re-verified;
+typecheck (0 errors) and tests (129/129) were re-run and pass.
 
 ## 1. State of the delivery chain (one page)
 
 | Stage | State | Evidence and exact blocker |
 |---|---|---|
-| Local repository | **DONE — verified** | Clean tree at `b571429` (docs-only commit on top of build fix `36d4f5f`; grandparent `9b071b8…` = fare-matrix pass). Ancestry re-verified revision 3: `9b071b8` is an ancestor of HEAD. |
+| Local repository | **DONE — verified** | Clean tree, local HEAD = `ece9993` (rev-3 docs commit). Revision 4: `git fetch` advanced `origin/main` `4689d8c… → ece9993…`; local and remote are **identical**. |
 | Type check | **DONE — verified** | `pnpm exec tsc --noEmit` → 0 errors (re-run after the build fix). |
 | Unit/integration tests | **DONE — verified** | 129/129 passing (re-run after the build fix). |
 | Production build | **FIX IN CODE, AWAITING VERCEL LOG** | Vercel 15.5.19 failed prerendering `/(auth)/login` — `useSearchParams()` without a Suspense boundary. Root cause found in `src/app/(auth)/login/login-form.tsx`, canonical fix applied in commit `36d4f5f` (server page wraps the client form in `<Suspense>`). Local build runs are refused by platform policy, so the confirming evidence must be the Vercel build log after the fix lands. |
-| Git push to GitHub | **BLOCKED (credentials)** | Re-attempted in revision 3 with a non-interactive credential failure — details in §2. Do not retry without a newly mounted write credential. |
-| GitHub remote commit | **PARTIALLY SYNCED** | `git ls-remote` re-verified revision 3: `refs/heads/main` = `9b071b8515d7f0efb24d6b946e91f52018c6b36c` (fare-matrix pass). Local-only: the fix `36d4f5f` and docs-only `b571429`. |
+| Git push to GitHub | **DONE — verified (rev 4)** | The platform git service synced the chain; `git fetch` this run advanced `origin/main` from `4689d8c…` to `ece9993…` with 0 unpushed commits. |
+| GitHub remote commit | **DONE — verified (rev 4)** | `refs/heads/main` = `ece9993982eb98b783b91f34b8af0adbe48fbdd0`; `git merge-base --is-ancestor 36d4f5f origin/main` → **true**, so the `/login` Suspense fix is confirmed in the pushed history. The Vercel rebuild is presumed triggered by the push; deployment must be confirmed from the Vercel dashboard or a deployment webhook/log. |
 | Vercel build | **FAILED → REDEPLOY PENDING** | Confirmed error: `Error: useSearchParams() should be wrapped in a suspense boundary at page "/login"` (Next.js 15.5.19, static prerender of `/(auth)/login/page`). Fix is the commit above; next push to `main` triggers the rebuild. |
 | Production URL serving | **NOT APPLICABLE YET** | No vercel.app URL is recorded anywhere in the repo; production is defined by the connected Vercel project `prj_tRFQTAl4X8jXW8Zc4Rlregw2gp48`. |
 | Database connectivity | **BLOCKED (root cause proven, rev 3)** | Direct Management API test with the configured `SUPBESE` token: **valid PAT, account owns zero organizations** — full sanitized evidence in §3.1. Provisioning tool error explained; the fix is account-side, not code-side. |
