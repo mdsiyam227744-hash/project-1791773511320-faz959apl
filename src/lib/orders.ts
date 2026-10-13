@@ -87,6 +87,8 @@ export interface CreateOrderInput {
     contactWhatsapp?: string | null;
     contactImo?: string | null;
     notes?: string | null;
+    /** Provider quote the customer selected (verbatim; staff re-verify before booking). */
+    selectedQuote?: { airline: string; price: number; currency: string; stops: number } | null;
   };
 }
 
@@ -147,6 +149,7 @@ export async function createFlightAssistanceOrder(
         contactWhatsapp: input.trip.contactWhatsapp ?? null,
         contactImo: input.trip.contactImo ?? null,
         notes: input.trip.notes ?? null,
+        selectedQuote: input.trip.selectedQuote ?? null,
       },
       origin_country: input.trip.originCountry.toUpperCase(),
       destination_country: input.trip.destinationCountry.toUpperCase(),

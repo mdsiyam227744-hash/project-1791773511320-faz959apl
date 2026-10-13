@@ -13,6 +13,43 @@ export interface FlightQuote {
 
 const R_EARTH_KM = 6371;
 
+/** IATA-code/date validation shared by the API route, the provider client, and tests. */
+export type FlightSearchFailureReason =
+  | "flights_provider_not_configured"
+  | "flights_provider_auth_failed"
+  | "flights_provider_error"
+  | "flights_rate_limited"
+  | "invalid_route"
+  | "invalid_params";
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Pure validation of a flight-search request. Returns the first failure
+ * reason, or null when the request is well-formed. Same-airport routes are
+ * rejected before any provider call.
+ */
+export function validateFlightSearchParams(opts: {
+  originIata: string;
+  destinationIata: string;
+  date: string;
+  returnDate?: string | null;
+}): FlightSearchFailureReason | null {
+  if (
+    !/^[A-Z]{3}$/.test(opts.originIata) ||
+    !/^[A-Z]{3}$/.test(opts.destinationIata) ||
+    !ISO_DATE.test(opts.date)
+  ) {
+    return "invalid_params";
+  }
+  if (opts.originIata === opts.destinationIata) return "invalid_route";
+  if (opts.returnDate) {
+    if (!ISO_DATE.test(opts.returnDate)) return "invalid_params";
+    if (opts.returnDate < opts.date) return "invalid_params";
+  }
+  return null;
+}
+
 /** Great-circle distance in km between two coordinate pairs (pure function). */
 export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;

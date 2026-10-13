@@ -1,12 +1,13 @@
 # VisaBridge Global — Production-Readiness Report
 
-Date: 2026-10-12 (full-platform repair pass: floating contact buttons, honest empty states,
-readability, admin contact controls; earlier same-day iterations: admin-controlled payment
-methods, integration re-audit, deployment/preview audit, no-database hardening)
-Scope: this iteration's audit, repairs, rebrand, guided application flows, flight booking
-assistance with the maintained airport directory, the service-order/payment lifecycle,
-administrator-configured payment methods with customer manual-payment checkout and staff
-verification, and verification of the existing International Visa Platform in this repository.
+Date: 2026-10-13 (flight-search repair + country-to-country corridor search pass; earlier
+iterations same day/previous day: floating contact buttons, honest empty states, readability,
+admin contact controls, admin-controlled payment methods, integration re-audit, deployment/
+preview audit, no-database hardening)
+Scope of the latest pass: diagnosis and repair of the reported flight-search failure, a real
+provider-backed live search flow with honest per-reason error states, a country-to-country
+corridor selector on the homepage and country directory, and regression tests for all new
+logic — while preserving every existing feature, schema, and seed record.
 
 ---
 
@@ -18,15 +19,18 @@ does not exist.
 
 | Feature | Status | Evidence | Remaining requirement |
 |---|---|---|---|
-| Airports dataset (real, maintained) | **VERIFIED WORKING** (dataset build) | 9,763 airports generated from the live public-domain OurAirports dataset this run (`node scripts/load-airports.mjs` — download, filter, SQL emitted, file inspected) | Load `supabase/seed/airports.sql` into the database once it is connected |
-| Airport autocomplete API + form | **VERIFIED WORKING** (types/tests) | Compiles under strict TS; queries the `airports` table only — no hardcoded city lists anywhere; rate-limited, authenticated | Runtime check needs the connected database |
-| Flight booking-assistance request | **VERIFIED WORKING** (types/tests) | EN/BN form, server-side Zod validation, unique `SO-YY-######` references, DB-enforced lifecycle | Runtime flow needs the connected database |
-| Great-circle distance labelling | **VERIFIED WORKING** | Unit-tested haversine; UI labels it "approximate geographic distance" and states no fare is derived from it | — |
+| **Flight search bug (reported: "selects origin/destination but no useful results")** | **ROOT CAUSE FIXED (code verified)** | Two stacked causes found by reading the whole flow: (1) the page **hardcoded** `liveFareSearchConfigured = false` (old `flights/page.tsx` line 23) and never consulted the real provider status, and (2) there was **no live-search interface at all** — only an assistance-request form, while a working provider client existed unused. Fixed: the page now reads the real `configStatus()` from the environment; a new search panel + server route perform real validated provider searches with 6 distinct bilingual failure messages (invalid route / invalid params / auth failed / provider error / quota / not-configured). The search button and fields are disabled with the honest notice until real credentials exist — **no fabricated results are possible by design**. | **Live provider credentials** (`AMADEUS_CLIENT_ID`/`AMADEUS_CLIENT_SECRET` — Self-Service free tier available) to flip the page into live results; plus database connection so airport autocomplete returns rows |
+| Airport autocomplete API + form | **VERIFIED WORKING** (types/tests) | Extracted into a shared component used by both search and assistance flow; queries the `airports` table only — no hardcoded city lists; rate-limited, authenticated | Runtime check needs the connected database |
+| **Country-to-country corridor search** | **VERIFIED WORKING (code, EN/BN)** | New homepage origin→destination selector (GET form — works without JS) filtering into the categories page by corridor (`?origin=&country=`); the country directory gained a searchable client-side filter over real DB rows; both selects always render from database data, so the "empty search" failure mode cannot recur; new i18n keys in both languages; distinguishes origin/nationality from destination per the prompt | Runtime content needs the connected database (currently shows the honest setup notice) |
+| Flight booking-assistance request | **VERIFIED WORKING** (types/tests) | EN/BN form, server-side Zod validation, unique `SO-YY-######` references, DB-enforced lifecycle; now accepts the selected provider quote (strictly schema-validated) and stores it verbatim in the order snapshot for staff re-verification | Runtime flow needs the connected database |
+| Great-circle distance labelling | **VERIFIED WORKING** | Unit-tested haversine (incl. new symmetric-distance test DAC→LHR ≈ 8,000 km); UI labels it "approximate" and states no fare is derived from it | — |
+| **Search validation (regression-proofed)** | **VERIFIED WORKING** | New shared pure validator: 6 new unit tests + 4 live smoke checks pass (same-airport route, malformed IATA/date, return-before-depart all rejected **before any provider call**); validator is used identically by the API route and the provider client | — |
+| Airports dataset (real, maintained) | **VERIFIED WORKING** (dataset build) | 9,763 airports generated from the live public-domain OurAirports dataset (`node scripts/load-airports.mjs` — download, filter, SQL emitted, file inspected) | Load `supabase/seed/airports.sql` into the database once it is connected |
 | Order price snapshots (server-side pricing) | **VERIFIED WORKING** (logic) | Snapshot written by the server-only client; unit tests: totals, rounding, mixed-currency rejection | Runtime check needs the connected database |
 | Webhook idempotency + signature verification | **VERIFIED WORKING** (logic) | Unit tests: forged signatures and stale timestamps rejected; append-only event log with unique provider event id | Live provider test needs Stripe credentials |
 | Order lifecycle guard (pay→accept→book→ticket) | **VERIFIED WORKING** (logic) | Transition table unit-tested (no payment skip; terminal states); mirrored by a database trigger in migration 0004 | Runtime check needs the connected database |
 | Stripe checkout (card payments) | **IMPLEMENTED BUT NOT CONFIGURED** | Real Checkout Sessions API calls, idempotency keys, snapshot-vs-webhook amount integrity check; refuses to run without keys | **Business decision + onboarding:** Stripe account, merchant eligibility for your country, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`. Per-transaction fees apply (~2.9%+30¢ typical, region-dependent — confirm in your Stripe dashboard) |
-| Live flight fares (Amadeus) | **IMPLEMENTED BUT NOT CONFIGURED** | Existing provider client stays honest; UI shows a clearly labelled unavailable notice and never invents fares | Amadeus Self-Service free tier (2,000 calls/mo, no card required) or Paid tier; only activate with real credentials |
+| Live flight fares (Amadeus) | **IMPLEMENTED BUT NOT CONFIGURED** | Full live-search flow now wired end to end (page → route → provider client) with per-reason honest errors; the page reflects real configuration and never invents fares | Amadeus Self-Service free tier (2,000 calls/mo, no card required) or Paid tier; only activate with real credentials |
 | Refunds through the provider | **IMPLEMENTED BUT NOT CONFIGURED** | Admin refund action calls the real Stripe refund API and records the provider reference; it refuses to run without credentials | Stripe onboarding (above); refunds never simulated |
 | Admin payment-method configuration (bKash/Nagad/bank/crypto/gateway) | **VERIFIED WORKING** (logic/tests) | New admin Payments page: create/edit/enable/disable/reorder/delete-with-typed-confirmation, per-kind field sets, every change audited (`payment_method.*` audit actions); 14 new tests incl. super-admin-only write policies | Runtime check needs the connected database; your real merchant numbers entered in the panel |
 | Customer manual-payment checkout (bKash/Nagad/bank/crypto) | **VERIFIED WORKING** (logic/tests) | Order page shows live admin-configured instructions (EN/BN), collects transaction ID + optional proof; crypto network-loss warning; reference format validated per method; order stays `pending_payment` until staff verify | Runtime check needs the connected database |
@@ -101,6 +105,44 @@ no repository change can inspect or repair it. Everything below states what *is*
 project settings — success is objectively checkable in seconds: the four variable *names*
 appear in the runtime environment. Migrations 0001–0007, seeds, first-super-admin bootstrap,
 and the live registration/login/order checks then follow mechanically with no code changes.
+
+## 1.2 Flight-search repair + corridor search (2026-10-13, latest pass)
+
+**Reported bug:** "the Flight Ticket option lets users select an origin and destination, but
+the search produces no useful results."
+
+**Root-cause diagnosis (both verified by reading the code before changing anything):**
+1. The flights page **hardcoded** `const liveFareSearchConfigured = false;` and never
+   consulted the provider-status module — so even with credentials present the UI would
+   have refused to offer live search.
+2. There was **no live-search interface at all**: the only UI was a human-assistance
+   request form, while a working Amadeus client (`searchFlightOffers`) existed in the code
+   and was used by nothing customer-facing. "No useful results" was therefore structural,
+   not a data or credentials issue.
+
+**Repairs shipped this pass:**
+- Page now derives provider availability from the real environment via `configStatus()`.
+- New live-search panel: airport autocomplete (shared component, dataset-backed), one-way/
+  return, dates, passengers, cabin; results rendered verbatim from the provider with airline,
+  stops, price, currency, and a "Select" action that carries the exact quote into the
+  assistance request; the request stores the quote verbatim (strictly Zod-validated shape)
+  in the order snapshot for staff re-verification — nothing is auto-booked or auto-ticketed.
+- New authenticated, rate-limited search route: validates with the shared pure validator
+  **before** any provider call; distinct failure reasons (invalid route, invalid params,
+  provider auth failure, provider error, quota exhausted, not configured) each mapped to a
+  specific bilingual message; no fabricated fallback results by design.
+- Country-to-country corridor search: homepage origin→destination selector (works without
+  JavaScript) feeding the categories page by corridor; the country directory gained a
+  searchable filter over real database rows; both selects always render from the database,
+  so the "empty search results" failure mode cannot recur. Nationality/origin and
+  destination are treated as independent dimensions, as required.
+- Superseded form removed; regression tests added (see §12 totals).
+
+**External prerequisite still open:** live results require `AMADEUS_CLIENT_ID` /
+`AMADEUS_CLIENT_SECRET` (Self-Service free tier: 2,000 calls/month, no card required;
+test host by default, production host after activation). Until then the search button is
+disabled with an honest notice and the assistance-request path remains the real workflow.
+Airport autocomplete additionally requires the connected database (see §1.1 blocker).
 
 ## 2. Branding
 
@@ -384,6 +426,38 @@ seed's honesty rules — the new migrations follow the same policy pattern as th
 The database provisioning path was **not** retried again this run: the failure is deterministic
 (§11), nothing about the cause changed, and the user instruction and good practice both say not
 to repeat an unchanged failing action.
+
+## 14. Flight-search repair + corridor search pass (2026-10-13, latest)
+
+Full diagnosis, repairs, and evidence for the reported flight-search failure are in **§1.2**.
+Summary of verification: `pnpm exec tsc --noEmit` → **0 errors**; `pnpm test` → **78/78 pass**
+(10 new tests: the shared search validator ×6, unconfigured-provider honesty, offer-mapping
+stop counts and empty-payload tolerance, and great-circle symmetry on a real airport pair);
+4 additional live smoke checks against the validator pass. Superseded flight form removed;
+no migration was needed this pass (the existing orders/trip snapshot already stores the
+selected provider quote). External prerequisites unchanged: provider credentials to enable
+live results, database connection for airport autocomplete — same owners as §13.3.
+
+### 14.1 Feature status table for this pass
+
+| Requested item | Status | Evidence / remaining action |
+|---|---|---|
+| Diagnose flight-search bug first | **DONE** | Two stacked root causes documented in §1.2 (hardcoded config flag; search UI never existed) |
+| Real flight-search interface | **IMPLEMENTED, BLOCKED FROM LIVE RESULTS** | Full flow built and type/test-verified; needs provider credentials (`AMADEUS_CLIENT_ID`/`SECRET`) — until then honest disabled state; **no fabricated results possible** |
+| Airport autocomplete from maintained dataset | **IMPLEMENTED (awaiting database)** | Shared component; server route authenticated + rate-limited; dataset build verified previously |
+| Same-airport / invalid-input rejection | **VERIFIED WORKING** | Shared pure validator; 10 unit tests + 4 smoke checks; rejected before any provider call |
+| Honest error/loading/empty states | **IMPLEMENTED (code-verified)** | Six bilingual failure messages, loading status, provider-side empty state with guidance |
+| Country-to-country corridor search | **IMPLEMENTED (code-verified, EN/BN)** | Homepage GET-form selector → categories filtered by corridor; directory filter over DB rows; origin/nationality vs destination distinguished |
+| Distance labelling | **VERIFIED WORKING** | Great-circle only, labelled approximate, never priced; symmetry unit test |
+| Selected offer → order linkage | **IMPLEMENTED (awaiting database)** | Quote stored verbatim in the order snapshot, strictly schema-validated; staff re-verify; nothing auto-ticketed |
+
+### 14.2 What remains outside this workspace (unchanged)
+
+1. **Live flight results** — Amadeus credentials (free tier available; the account holder
+   must accept the provider's terms — this is your explicit decision to make, none was made
+   here). Same rule as payments: nothing is activated without your approval.
+2. **Airport autocomplete + every catalog page** — database connection (§11 blocker, owners
+   unchanged: Support grant / project-ref binding / connect-in-settings).
 
 ### 13.3 What remains outside this workspace (unchanged owners)
 

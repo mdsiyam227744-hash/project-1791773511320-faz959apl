@@ -4,6 +4,13 @@ import { getSessionUser } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createFlightAssistanceOrder } from "@/lib/orders";
 
+const quoteSchema = z.object({
+  airline: z.string().trim().min(1).max(80),
+  price: z.number().nonnegative(),
+  currency: z.string().trim().length(3),
+  stops: z.number().int().min(0).max(9),
+});
+
 const bodySchema = z.object({
   originAirportId: z.string().uuid(),
   destinationAirportId: z.string().uuid(),
@@ -18,6 +25,7 @@ const bodySchema = z.object({
   contactWhatsapp: z.string().trim().max(24).optional().nullable(),
   contactImo: z.string().trim().max(200).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
+  selectedQuote: quoteSchema.nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -50,6 +58,7 @@ export async function POST(request: Request) {
       contactWhatsapp: parsed.data.contactWhatsapp ?? null,
       contactImo: parsed.data.contactImo ?? null,
       notes: parsed.data.notes ?? null,
+      selectedQuote: parsed.data.selectedQuote ?? null,
     },
   });
 

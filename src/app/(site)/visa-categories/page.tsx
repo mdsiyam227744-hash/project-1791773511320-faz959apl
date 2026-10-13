@@ -31,13 +31,17 @@ const CATEGORY_HELP: Record<string, string> = {
 export default async function VisaCategoriesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ country?: string }>;
+  searchParams: Promise<{ country?: string; origin?: string }>;
 }) {
-  const { country } = await searchParams;
+  const { country, origin } = await searchParams;
   const brand = await getBrand();
   const locale = brand.defaultLocale;
   const categories = await listCategories();
-  const listings = await listVisaListings({ destinationIso2: country, limit: 100 });
+  const listings = await listVisaListings({
+    destinationIso2: country,
+    originIso2: origin,
+    limit: 100,
+  });
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
@@ -49,7 +53,13 @@ export default async function VisaCategoriesPage({
       </p>
       {country ? (
         <p className="mt-3 text-base text-navy-600">
-          Showing listings for destination country <strong>{country}</strong>.{" "}
+          Showing listings for destination country <strong>{country}</strong>
+          {origin ? (
+            <>
+              {" "}departing from <strong>{origin}</strong>
+            </>
+          ) : null}
+          .{" "}
           <Link href="/visa-categories" className="font-medium underline">
             Clear filter
           </Link>

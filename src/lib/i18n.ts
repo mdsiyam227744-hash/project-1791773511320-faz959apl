@@ -40,6 +40,13 @@ const en = {
   "home.directory.title": "Browse the worldwide directory",
   "home.directory.body":
     "Country records, visa categories, official fees with sources, and processing-time estimates. Anything we have not verified is labelled as such.",
+  "home.corridor.origin": "Travelling from (nationality / residence)",
+  "home.corridor.destination": "Destination country",
+  "home.corridor.anyOrigin": "Any origin",
+  "home.corridor.chooseDestination": "Choose a destination…",
+  "home.corridor.search": "Show requirements",
+  "home.corridor.note":
+    "Nationality, residence, and destination are assessed separately — requirements differ by passport and by country of residence, and not every corridor is eligible for every visa.",
 
   "common.loading": "Loading…",
   "common.error": "Something went wrong. Please try again.",
@@ -110,6 +117,25 @@ const en = {
   "flights.loginRequired": "Log in to request flight booking assistance.",
   "flights.searchPlaceholder": "City or airport (e.g. Dhaka, DAC, London)",
   "flights.selectAirport": "Select an airport",
+  "flights.searchTitle": "Search live flights",
+  "flights.requestTitle": "Request booking assistance",
+  "flights.searchButton": "Search flights",
+  "flights.searching": "Searching…",
+  "flights.resultsTitle": "Live results from our flight data provider",
+  "flights.resultsNote":
+    "Prices are provider quotes retrieved just now and can change until booked. Selecting an option prepares a booking-assistance request — our team confirms the fare with you before anything is booked.",
+  "flights.direct": "Direct",
+  "flights.stops": "stop(s)",
+  "flights.priceUnavailable": "Price unavailable",
+  "flights.selectOffer": "Select",
+  "flights.noResults":
+    "The provider returned no flights for this route and date. Try nearby dates or a different cabin — or send the assistance request below and our team will check with airlines directly.",
+  "flights.noResultsHint": "The result below is live provider data — nothing is stored or fabricated.",
+  "flights.selectedOffer": "Selected option",
+  "flights.selectedOfferNote":
+    "The provider quote is stored with your request as provided just now; we re-confirm it before any booking.",
+  "flights.corridorsNote":
+    "Our assistance covers {count} countries in the directory —",
 
   "orders.title": "My service orders",
   "orders.empty": "No service orders yet.",
@@ -279,6 +305,13 @@ const bn: Record<keyof typeof en, string> = {
   "home.directory.title": "বিশ্বব্যাপী ডিরেক্টরি ব্রাউজ করুন",
   "home.directory.body":
     "দেশের তথ্য, ভিসার ধরন, সূত্রসহ সরকারি ফি এবং প্রসেসিং সময়ের আনুমানিক হিসাব। যা আমরা যাচাই করিনি, তা স্পষ্টভাবে লেখা থাকে।",
+  "home.corridor.origin": "যাত্রা শুরুর দেশ (জাতীয়তা / বসবাস)",
+  "home.corridor.destination": "গন্তব্য দেশ",
+  "home.corridor.anyOrigin": "যেকোনো উৎপত্তি",
+  "home.corridor.chooseDestination": "গন্তব্য নির্বাচন করুন…",
+  "home.corridor.search": "প্রয়োজনীয়তা দেখুন",
+  "home.corridor.note":
+    "জাতীয়তা, বসবাস ও গন্তব্য আলাদাভাবে বিবেচনা করা হয় — পাসপোর্ড ও বসবাসের দেশ অনুযায়ী নিয়ম ভিন্ন হয়, এবং প্রতিটি করিডোর প্রতিটি ভিসার জন্য যোগ্য নয়।",
 
   "common.loading": "লোড হচ্ছে…",
   "common.error": "কিছু একটা সমস্যা হয়েছে। আবার চেষ্টা করুন।",
@@ -418,6 +451,24 @@ const bn: Record<keyof typeof en, string> = {
   "flights.loginRequired": "ফ্লাইট বুকিং সহায়তার অনুরোধ করতে লগ ইন করুন।",
   "flights.searchPlaceholder": "শহর বা বিমানবন্দর (যেমন ঢাকা, DAC, London)",
   "flights.selectAirport": "একটি বিমানবন্দর নির্বাচন করুন",
+  "flights.searchTitle": "সরাসরি ফ্লাইট অনুসন্ধান",
+  "flights.requestTitle": "বুকিং সহায়তার অনুরোধ",
+  "flights.searchButton": "ফ্লাইট খুঁজুন",
+  "flights.searching": "খোঁজা হচ্ছে…",
+  "flights.resultsTitle": "আমাদের ফ্লাইট ডেটা সরবরাহকারীর সরাসরি ফলাফল",
+  "flights.resultsNote":
+    "দামগুলো এইমাত্র পাওয়া সরবরাহকারীর কোটেশন — বুকিংয়ের আগে পরিবর্তন হতে পারে। একটি নির্বাচন করলে বুকিং-সহায়তা অনুরোধ তৈরি হয়; কিছু বুক করার আগে আমাদের টিম আপনার সঙ্গে ভাড়া নিশ্চিত করবে।",
+  "flights.direct": "সরাসরি",
+  "flights.stops": "স্টপ",
+  "flights.priceUnavailable": "দাম অনুপলব্ধ",
+  "flights.selectOffer": "নির্বাচন",
+  "flights.noResults":
+    "এই রুট ও তারিখের জন্য সরবরাহকারীর কোনো ফ্লাইট ফেরত আসেনি। কাছাকাছি তারিখ বা ভিন্ন কেবিন দিয়ে চেষ্টা করুন — অথবা নিচের সহায়তা-অনুরোধ পাঠান, আমাদের টিম সরাসরি এয়ারলাইনের সঙ্গে যাচাই করবে।",
+  "flights.noResultsHint": "নিচের ফলাফল সরবরাহকারীর সরাসরি ডেটা — কিছু সংরক্ষণ বা তৈরি করা হয় না।",
+  "flights.selectedOffer": "নির্বাচিত অপশন",
+  "flights.selectedOfferNote":
+    "সরবরাহকারীর কোটেশনটি এইমাত্র পাওয়া অবস্থায় আপনার অনুরোধের সঙ্গে সংরক্ষিত হয়; বুকিংয়ের আগে আমরা তা পুনরায় নিশ্চিত করি।",
+  "flights.corridorsNote": "আমাদের সহায়তা ডিরেক্টরিতে থাকা {count}টি দেশ জুড়ে —",
 
   "orders.title": "আমার সেবা অর্ডার",
   "orders.empty": "এখনো কোনো সেবা অর্ডার নেই।",

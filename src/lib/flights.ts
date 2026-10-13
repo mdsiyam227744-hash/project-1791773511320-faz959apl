@@ -3,9 +3,9 @@
  *
  * When AMADEUS_CLIENT_ID / AMADEUS_CLIENT_SECRET are not configured, every
  * function reports { available: false, reason: "flights_provider_not_configured" }
- * and the UI shows "Live fare unavailable — request a quote." No fares are
- * ever invented. Distance uses the geodesic (great-circle) formula between city
- * coordinates and is always labelled as such — never as actual flown distance.
+ * and the UI shows the honest unavailable state. No fares are ever invented.
+ * Distance uses the geodesic (great-circle) formula between airport coordinates
+ * and is always labelled as approximate — never as actual flown distance.
  */
 
 const HOSTNAME = process.env.AMADEUS_HOSTNAME || "test.api.amadeus.com";
@@ -41,16 +41,11 @@ export async function getAccessToken(): Promise<string | null> {
       "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
     },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-    }),
+    body: new URLSearchParams({ grant_type: "client_credentials" }),
   });
   if (!res.ok) return null;
   const json = (await res.json()) as { access_token: string; expires_in: number };
-  tokenCache = {
-    token: json.access_token,
-    expiresAt: Date.now() + json.expires_in * 1000,
-  };
+  tokenCache = { token: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
   return tokenCache.token;
 }
 
@@ -65,21 +60,13 @@ export interface RouteCity {
 export async function lookupCity(keyword: string): Promise<RouteCity[]> {
   const token = await getAccessToken();
   if (!token) return [];
-  const params = new URLSearchParams({
-    subType: "CITY",
-    keyword,
-    "page[limit]": "5",
-  });
+  const params = new URLSearchParams({ subType: "CITY", keyword, "page[limit]": "5" });
   const res = await fetch(`${BASE}/v1/reference-data/locations?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) return [];
   const json = (await res.json()) as {
-    data?: {
-      iataCode: string;
-      name: string;
-      geoCode?: { latitude?: number; longitude?: number };
-    }[];
+    data?: { iataCode: string; name: string; geoCode?: { latitude?: number; longitude?: number } }[];
   };
   return (json.data ?? []).map((d) => ({
     iataCode: d.iataCode,
@@ -104,49 +91,69 @@ export interface FlightSearchResult {
   sourceUrl?: string;
 }
 
-export async function searchFlightOffers(opts: {
+import { validateFlightSearchParams } from "./geo.ts";
+export { validateFlightSearchParams };
+export type { FlightSearchFailureReason } from "./geo.ts";
+
+export interface FlightSearchOptions {
   originIata: string;
   destinationIata: string;
   date: string; // YYYY-MM-DD
+  returnDate?: string | null; // YYYY-MM-DD, round trips only
   adults?: number;
+  cabinClass?: "economy" | "premium_economy" | "business" | "first";
   currency?: string;
   max?: number;
-}): Promise<FlightSearchResult> {
+}
+
+export async function searchFlightOffers(
+  opts: FlightSearchOptions,
+): Promise<FlightSearchResult> {
   if (!configStatus().configured) {
-    return {
-      available: false,
-      reason: "flights_provider_not_configured",
-      quotes: [],
-      retrievedAt: new Date().toISOString(),
-    };
+    return { available: false, reason: "flights_provider_not_configured", quotes: [], retrievedAt: new Date().toISOString() };
+  }
+  const validationError = validateFlightSearchParams({
+    originIata: opts.originIata,
+    destinationIata: opts.destinationIata,
+    date: opts.date,
+    returnDate: opts.returnDate ?? null,
+  });
+  if (validationError) {
+    return { available: false, reason: validationError, quotes: [], retrievedAt: new Date().toISOString() };
   }
   const token = await getAccessToken();
   if (!token) {
-    return {
-      available: false,
-      reason: "flights_provider_auth_failed",
-      quotes: [],
-      retrievedAt: new Date().toISOString(),
-    };
+    return { available: false, reason: "flights_provider_auth_failed", quotes: [], retrievedAt: new Date().toISOString() };
   }
+
+  const cabinMap = {
+    economy: "ECONOMY",
+    premium_economy: "PREMIUM_ECONOMY",
+    business: "BUSINESS",
+    first: "FIRST",
+  } as const;
   const params = new URLSearchParams({
-    originLocationCode: opts.originIata,
-    destinationLocationCode: opts.destinationIata,
+    originLocationCode: opts.originIata.toUpperCase(),
+    destinationLocationCode: opts.destinationIata.toUpperCase(),
     departureDate: opts.date,
     adults: String(opts.adults ?? 1),
     currencyCode: opts.currency ?? "USD",
     max: String(opts.max ?? 5),
+    numberOfResults: String(opts.max ?? 5),
   });
+  if (opts.returnDate) params.set("returnDate", opts.returnDate);
+  if (opts.cabinClass && opts.cabinClass in cabinMap) {
+    params.set("travelClass", cabinMap[opts.cabinClass]);
+  }
+
   const res = await fetch(`${BASE}/v2/shopping/flight-offers?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  if (res.status === 429) {
+    return { available: false, reason: "flights_rate_limited", quotes: [], retrievedAt: new Date().toISOString() };
+  }
   if (!res.ok) {
-    return {
-      available: false,
-      reason: "flights_provider_error",
-      quotes: [],
-      retrievedAt: new Date().toISOString(),
-    };
+    return { available: false, reason: "flights_provider_error", quotes: [], retrievedAt: new Date().toISOString() };
   }
   const json = (await res.json()) as { data?: unknown[] };
   const quotes = (json.data ?? []).slice(0, opts.max ?? 5).map((o) => mapOffer(o));
@@ -177,4 +184,4 @@ export function mapOffer(offer: unknown): FlightQuote {
 
 // Distance and offer-mapping helpers live in the pure, dependency-free geo module
 // (shared with the unit tests).
-export { haversineKm } from "./geo";
+export { haversineKm } from "./geo.ts";

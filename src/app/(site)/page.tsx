@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const [brand, countries, categories, recentVisas] = await Promise.all([
     getBrand(),
-    listCountries({ destination: true }),
+    listCountries(),
     listCategories(),
     listVisaListings({ limit: 6 }),
   ]);
@@ -54,6 +54,78 @@ export default async function HomePage() {
             </Link>
           </div>
         </div>
+      </section>
+
+      {/* Service tabs — every visa type has its own target; flights are separate */}
+      <section aria-label="Our services" className="border-b border-navy-100 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap gap-2 px-4 py-4">
+          <Link
+            href="/flights"
+            className="rounded-full bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+          >
+            {t(locale, "nav.flights")}
+          </Link>
+          {categories.map((c) => (
+            <Link
+              key={c.code}
+              href={`/visa-categories#${c.code}`}
+              className="rounded-full border border-navy-200 px-4 py-2 text-sm font-medium text-navy-700 hover:border-[var(--brand-secondary)] hover:bg-navy-50"
+            >
+              {locale === "bn" && c.label_bn ? c.label_bn : c.label_en}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Corridor selector — origin and destination are independent; a GET form,
+          so it works without client JS and reflects the database contents */}
+      <section aria-label="Find visa requirements" className="bg-white">
+        <form action="/visa-categories" method="get" className="mx-auto max-w-6xl px-4 pb-6">
+          <div className="grid gap-3 rounded-xl border border-navy-100 bg-navy-50/60 p-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <div>
+              <label htmlFor="home-origin" className="mb-1 block text-sm font-medium text-navy-700">
+                {t(locale, "home.corridor.origin")}
+              </label>
+              <select
+                id="home-origin"
+                name="origin"
+                className="w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-base focus:border-[var(--brand-primary)] focus:outline-none"
+              >
+                <option value="">{t(locale, "home.corridor.anyOrigin")}</option>
+                {countries.filter((c) => c.is_origin).map((c) => (
+                  <option key={c.iso2} value={c.iso2}>
+                    {locale === "bn" && c.name_bn ? c.name_bn : c.name_en}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="home-dest" className="mb-1 block text-sm font-medium text-navy-700">
+                {t(locale, "home.corridor.destination")}
+              </label>
+              <select
+                id="home-dest"
+                name="country"
+                required
+                className="w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-base focus:border-[var(--brand-primary)] focus:outline-none"
+              >
+                <option value="">{t(locale, "home.corridor.chooseDestination")}</option>
+                {countries.filter((c) => c.is_destination).map((c) => (
+                  <option key={c.iso2} value={c.iso2}>
+                    {locale === "bn" && c.name_bn ? c.name_bn : c.name_en}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              className="rounded-md bg-[var(--brand-secondary)] px-5 py-2.5 text-sm font-semibold text-navy-950 hover:opacity-90"
+            >
+              {t(locale, "home.corridor.search")}
+            </button>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-navy-500">{t(locale, "home.corridor.note")}</p>
+        </form>
       </section>
 
       {/* Why global mobility */}
