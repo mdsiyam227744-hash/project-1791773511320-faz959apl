@@ -4,20 +4,25 @@ Prepared: 2026-10-13 · Scope: repository-to-production delivery chain. This rep
 exists so that no one — including future sessions — can mistake "code and tests
 pass" for "deployed and serving". Revision 2 (later the same day): covers the
 Vercel production build failure on `/login` and the fix commit `36d4f5f`.
+Revision 3 (same day): the Supabase blocker's root cause is now **proven at the
+source** — the configured Management API token authenticates successfully and
+its account owns zero organizations (§3.1). The push was re-attempted after
+re-verifying ancestry and failed with the identical credential error (§2);
+local HEAD is now `b571429` (docs-only) on top of the fix.
 
 ## 1. State of the delivery chain (one page)
 
 | Stage | State | Evidence and exact blocker |
 |---|---|---|
-| Local repository | **DONE — verified** | Clean tree at `36d4f5f` (build-fix commit; parent `9b071b8…` = fare-matrix pass). `git status` clean, 0 modified files. |
+| Local repository | **DONE — verified** | Clean tree at `b571429` (docs-only commit on top of build fix `36d4f5f`; grandparent `9b071b8…` = fare-matrix pass). Ancestry re-verified revision 3: `9b071b8` is an ancestor of HEAD. |
 | Type check | **DONE — verified** | `pnpm exec tsc --noEmit` → 0 errors (re-run after the build fix). |
 | Unit/integration tests | **DONE — verified** | 129/129 passing (re-run after the build fix). |
 | Production build | **FIX IN CODE, AWAITING VERCEL LOG** | Vercel 15.5.19 failed prerendering `/(auth)/login` — `useSearchParams()` without a Suspense boundary. Root cause found in `src/app/(auth)/login/login-form.tsx`, canonical fix applied in commit `36d4f5f` (server page wraps the client form in `<Suspense>`). Local build runs are refused by platform policy, so the confirming evidence must be the Vercel build log after the fix lands. |
-| Git push to GitHub | **BLOCKED (credentials)** | Attempted again this run via `git push origin main`; failed unauthenticated — details in §2. |
-| GitHub remote commit | **PARTIALLY SYNCED** | Platform git service caught up between sessions: `git ls-remote` now shows `refs/heads/main` = `9b071b8515d7f0efb24d6b946e91f52018c6b36c` (fare-matrix pass). Only the newer fix commit `36d4f5f` is local-only. |
+| Git push to GitHub | **BLOCKED (credentials)** | Re-attempted in revision 3 with a non-interactive credential failure — details in §2. Do not retry without a newly mounted write credential. |
+| GitHub remote commit | **PARTIALLY SYNCED** | `git ls-remote` re-verified revision 3: `refs/heads/main` = `9b071b8515d7f0efb24d6b946e91f52018c6b36c` (fare-matrix pass). Local-only: the fix `36d4f5f` and docs-only `b571429`. |
 | Vercel build | **FAILED → REDEPLOY PENDING** | Confirmed error: `Error: useSearchParams() should be wrapped in a suspense boundary at page "/login"` (Next.js 15.5.19, static prerender of `/(auth)/login/page`). Fix is the commit above; next push to `main` triggers the rebuild. |
 | Production URL serving | **NOT APPLICABLE YET** | No vercel.app URL is recorded anywhere in the repo; production is defined by the connected Vercel project `prj_tRFQTAl4X8jXW8Zc4Rlregw2gp48`. |
-| Database connectivity | **BLOCKED (platform-side)** | Provisioning tool invoked again this run; identical error, word for word — §3. |
+| Database connectivity | **BLOCKED (root cause proven, rev 3)** | Direct Management API test with the configured `SUPBESE` token: **valid PAT, account owns zero organizations** — full sanitized evidence in §3.1. Provisioning tool error explained; the fix is account-side, not code-side. |
 | Auth/persistence verification | **NOT STARTED** | Cannot start without a database. |
 | Live flight provider | **NOT CONFIGURED (by design)** | No `AMADEUS_CLIENT_ID`/`AMADEUS_CLIENT_SECRET` in the runtime (verified by env-name listing). Setup: §4 of `docs/OPERATIONS-CHECKLISTS.md`. |
 
@@ -39,21 +44,26 @@ credentials.
    `~/.git-credentials`, no SSH keys. The push grant lives with the platform's
    connected GitHub service, which is not an invocable tool in this run.
 
-**Conclusion (revision 2):** the push remains a clean fast-forward — the remote
-tip the platform synced equals the local parent of the fix commit — and the
-command was attempted again this run, failing identically unauthenticated. The
-platform's git service demonstrably synced all six prior commits between
+**Conclusion (revision 3):** the push remains a clean fast-forward — the remote
+tip the platform synced (`9b071b8`) is a verified local ancestor of HEAD
+(`b571429`) — and was attempted once more with `GIT_TERMINAL_PROMPT=0` so it
+could not hang, failing with the identical credential error observed in
+revision 3:
+
+> `fatal: could not read Username for 'https://github.com': terminal prompts disabled`
+
+The platform's git service demonstrably synced all six prior commits between
 sessions (it reached `9b071b8`); the same channel is expected to carry
-`36d4f5f`. It requires an actor that holds the GitHub write credential: the
-platform's git service, or a one-time `git push origin main` from any session
-where that credential is mounted. Nothing is force-pushed; the remote has no
-commits to overwrite.
+`36d4f5f` and `b571429`. It requires an actor that holds the GitHub write
+credential: the platform's git service, or a one-time `git push origin main`
+from any session where that credential is mounted. Nothing is force-pushed;
+the remote has no commits to overwrite.
 
 **Definition of done (tick when verified, not assumed):**
 
 - [x] `git ls-remote origin` shows `refs/heads/main` =
-      `9b071b8515d7f0efb24d6b946e91f52018c6b36c` (verified this run — the six
-      earlier commits are on GitHub).
+      `9b071b8515d7f0efb24d6b946e91f52018c6b36c` (re-verified revision 3 — the
+      six earlier commits are on GitHub, the two newer ones are not).
 - [ ] `git ls-remote origin` shows `refs/heads/main` = the fix commit
       `36d4f5f…` (the next platform git sync should close this; verify, never
       assume).
@@ -62,32 +72,69 @@ commits to overwrite.
 
 ## 3. Supabase provisioning: retested through the supported path
 
-As instructed, the platform's own provisioning capability was invoked again —
-no workaround, no duplicate organization, no substitute database. Real response
-this run:
+As instructed, the platform's own provisioning capability was invoked in prior
+revisions — no workaround, no duplicate organization, no substitute database.
+Real response (revisions 1–2):
 
 > `The configured Supabase account has no organization to create a project in`
 
-This is more precise than the historical pre-flight `organizations_read`
-failure and points at the same place: **account state on the platform's
-Supabase integration**. Revision 2 re-invoked the platform provisioning tool
-after the build fix landed and received **the identical sentence, word for
-word** — not a permissions escalation, still an empty-organization condition.
-The account the integration uses has no organization, and organizations cannot
-be created from project tooling. This is not a code problem and cannot be
-repaired from the repository — every migration (`0001`–`0009`), policy, and
-seed file (including the fare-matrix seeds, which import into `needs_review`
-status by design) is already in the repo and applies unchanged the moment a
-database is bound.
+**Revision 3 root cause — proven at the source.** This run discovered that a
+Supabase Management API token (`SUPBESE`) **is** configured in the project
+environment (it was absent in earlier revisions, which is why it could never be
+tested before). A sanitized script (`scripts/ops/supabase-discovery.mjs`,
+committed) tested it directly against `api.supabase.com`:
 
-**Required action (outside this container):** in the Massvai platform's
-database integration settings, either create/select an organization on the
-linked Supabase account or re-link the integration with an account that has
-one. Platform Support escalation is the named path if the setting is not
-self-service.
+| Probe | Result |
+|---|---|
+| `GET /v1/projects` with the token | `403` — `Missing required permission(s): projects_read` |
+| `GET /v1/organizations` with the token | `200` — **empty array `[]`** |
+| `GET /v1/projects/<ref>` with a malformed ref | `400 Invalid project ref` (token passes auth, route is scoped) |
+
+Interpretation: the token is **valid** (Supabase rejected a bad ref instead of
+rejecting the credential, and returned 200 on the orgs route). The account it
+belongs to owns **zero organizations**, and at least the `projects_read` scope
+is absent. This exactly reproduces the provisioning tool's sentence: with no
+organizations, nothing can be created or discovered. It also means
+`international-visa-platform` (visible Healthy in the user's own dashboard)
+lives under a **different Supabase account** than the one this integration and
+token are bound to. The user's direct project access does not extend to the
+integration's account — two disconnected identities.
+
+**Required action (account-side, cannot be done from project tooling):**
+either (a) connect the integration/token to the account that actually owns
+`international-visa-platform`, or (b) create an organization on the currently
+linked account. Until then, no migrations, imports, or persistence checks can
+run; every migration (`0001`–`0009`), policy, and seed file (including the
+fare-matrix seeds, which import into `needs_review` status by design) is in
+the repo and applies unchanged the moment a database is bound.
 
 **Definition of done:** the four database variables exist in the project
 environment; then apply migrations in order and run the connection test in §5.
+
+### 3.1 Sanitized Management API evidence (revision 3)
+
+Raw sanitized outputs, token value never printed:
+
+```
+== 1. Management API authentication test (GET /v1/projects) ==
+projects list: HTTP 403 {"message":"Missing required permission(s):
+projects_read","error":{"missing_permissions":["projects_read"]}}
+
+== 2. Organizations visible to this PAT ==
+orgs list: HTTP 200 []
+
+scope diagnostic, malformed ref:
+project lookup (fake ref): HTTP 400 {"message":"Invalid project ref:
+00000000000000000000"}
+```
+
+**Definition of done for §3.1 (tick when verified):**
+
+- [ ] `GET /v1/organizations` with a corrected token returns a non-empty list.
+- [ ] `GET /v1/projects` returns the `international-visa-platform` ref (or the
+      four database variables appear in the project environment another way).
+- [ ] `node scripts/ops/supabase-discovery.mjs` completes sections 3–6 with
+      HTTP 200s, listing real tables and migration history.
 
 ## 4. Post-deployment verification checklist (run only after §2 and §3 close)
 
@@ -114,10 +161,10 @@ environment; then apply migrations in order and run the connection test in §5.
 
 ## 5. Residual risks to carry forward
 
-- The build-fix commit `36d4f5f` exists **only locally** until the next
-  platform git sync (all six earlier commits are confirmed on GitHub as of
-  revision 2); any future session must re-check `git ls-remote` before
-  assuming sync.
+- The build-fix commit `36d4f5f` and docs commit `b571429` exist **only
+  locally** until the next platform git sync (all six earlier commits are
+  confirmed on GitHub as of revision 3); any future session must re-check
+  `git ls-remote` before assuming sync.
 - The first migration application against a fresh database is still
   unexercised end-to-end; treat the §4.3 check as the acceptance gate, and
   keep the honest "database not connected" states until it passes.
