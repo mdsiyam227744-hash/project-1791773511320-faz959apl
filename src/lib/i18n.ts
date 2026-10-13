@@ -91,6 +91,12 @@ const en = {
     "A country has many airports and no single flight distance. Choose two specific airports for a precise airport-to-airport estimate.",
   "airports.pairCount": "approved airports listed",
 
+  "packages.title": "Assistance packages",
+  "packages.note":
+    "Our service fees are separate from official government fees. Government fees are paid to the government; amounts we have not verified against an official source are flagged.",
+  "packages.payableNow": "Payable here now",
+  "packages.ourTimeline": "Our service timeline",
+
   "common.from": "from",
   "common.save": "Save",
   "common.cancel": "Cancel",
@@ -394,6 +400,12 @@ const bn: Record<keyof typeof en, string> = {
   "airports.countryPair.note":
     "একটি দেশে অনেক বিমানবন্দর আছে এবং কোনো একক ফ্লাইট দূরত্ব নেই। সঠিক আনুমানিক হিসাবের জন্য দুটি নির্দিষ্ট বিমানবন্দর বেছে নিন।",
   "airports.pairCount": "অনুমোদিত বিমানবন্দর তালিকাভুক্ত",
+
+  "packages.title": "সেবা প্যাকেজ",
+  "packages.note":
+    "আমাদের সেবা মূল্য সরকারি ফি থেকে আলাদা। সরকারি ফি সরকার নিজে নেন; যে পরিমাণ আমরা দপ্তরিক সূত্রের সাথে মিলিয়ে যাচাই করিনি, তা চিহ্নিত করা থাকে।",
+  "packages.payableNow": "এখানে এখনই প্রদেয়",
+  "packages.ourTimeline": "আমাদের সেবার সময়সীমা",
 
   "common.from": "শুরু",
   "common.save": "সংরক্ষণ",

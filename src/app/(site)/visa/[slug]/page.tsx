@@ -5,6 +5,8 @@ import { getBrand } from "@/lib/settings";
 import { t } from "@/lib/i18n";
 import { getVisaListingBySlug } from "@/lib/catalog";
 import { getVisaFees, FEE_KIND_LABELS, type FeeKind } from "@/lib/fees";
+import { listPublicPackages } from "@/lib/packages";
+import { packageLines } from "@/lib/package-pricing";
 
 export async function generateMetadata({
   params,
@@ -27,6 +29,7 @@ export default async function VisaDetailPage({
 
   const locale = brand.defaultLocale;
   const fees = await getVisaFees(listing.id);
+  const packages = await listPublicPackages({ destinationIso2: listing.destination.iso2, categoryCode: listing.category_code, limit: 6 });
 
   const fields: { label: string; value: string | null }[] = [
     { label: t(locale, "common.processingTime"), value: listing.processing_time_estimate },
@@ -115,6 +118,57 @@ export default async function VisaDetailPage({
           separate and shown before you pay anything.
         </p>
       </section>
+
+      {/* Assistance packages (published only; government fee vs service fee) */}
+      {packages.length > 0 ? (
+        <section className="mt-10">
+          <h2 className="text-xl font-semibold">{t(locale, "packages.title")}</h2>
+          <p className="mt-1 text-sm text-navy-600">{t(locale, "packages.note")}</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {packages.map((p) => {
+              const breakdown = packageLines(p, locale);
+              return (
+                <div key={p.id} className="flex flex-col rounded-lg border border-navy-100 bg-white p-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-navy-500">{p.tier}</p>
+                  <h3 className="mt-1 font-semibold text-navy-900">{locale === "bn" && p.name_bn ? p.name_bn : p.name_en}</h3>
+                  {p.description_en ? (
+                    <p className="mt-2 text-sm text-navy-600">
+                      {locale === "bn" && p.description_bn ? p.description_bn : p.description_en}
+                    </p>
+                  ) : null}
+                  <ul className="mt-3 space-y-1 text-sm text-navy-700">
+                    {breakdown.lines.map((l, i) => (
+                      <li key={i} className="flex justify-between gap-2 border-b border-navy-50 pb-1">
+                        <span>{l.label}</span>
+                        <span className="text-right font-medium">
+                          {l.amount != null ? `${l.amount} ${l.currency}` : "—"}
+                          {l.kind === "government" && !l.verified ? " ⚠" : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-sm text-navy-600">
+                    <span className="font-semibold text-navy-900">
+                      {t(locale, "packages.payableNow")}: {breakdown.payableNow} {breakdown.currency}
+                    </span>
+                  </p>
+                  {p.timeline_en ? (
+                    <p className="mt-1 text-xs text-navy-500">
+                      {t(locale, "packages.ourTimeline")}: {locale === "bn" && p.timeline_bn ? p.timeline_bn : p.timeline_en}
+                    </p>
+                  ) : null}
+                  <Link
+                    href={`/apply/guided?visa=${listing.slug}&package=${p.slug}`}
+                    className="mt-4 rounded-md bg-[var(--brand-primary)] px-4 py-2 text-center text-sm font-semibold text-white hover:opacity-90"
+                  >
+                    {t(locale, "cta.apply")}
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {/* Details */}
       <section className="mt-10 grid gap-6 md:grid-cols-2">
