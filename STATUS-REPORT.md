@@ -65,6 +65,43 @@ does not exist.
   `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` — confirmed by inspection), so the moment the
   platform injects them, no further code work is required.
 
+### 1.1 Supabase integration audit (2026-10-13) — six-point checklist with evidence
+
+Scope note: the only database path exposed to this workspace is the platform's managed
+provisioning capability. The platform's integration backend (its token storage, its own
+servers, its internal logs) is outside the project sandbox and cannot be read from here —
+no repository change can inspect or repair it. Everything below states what *is* observable.
+
+| # | Checklist item | Finding | Evidence |
+|---|---|---|---|
+| 1 | Is a Personal Access Token persisted / available to the integration backend? | **Not inspectable from this workspace; no token material exists in the project.** The platform's managed provisioning never accepts a user-supplied PAT — it has no parameter for one — so no VisaBridge-side token is in the loop at all. | Repository-wide filename search (`.env*` → only `.env.example`, no token values) and content search (`personal_access_token`, `SUPABASE_ACCESS_TOKEN`, …) return zero matches outside this report. Runtime env contains **zero** `SUPABASE_*` / `DATABASE_URL` / `POSTGRES_*` variable *names* (checked by name only, 2026-10-13). |
+| 2 | Does the org-list request reach the correct endpoint, and what HTTP status/body comes back? | **No request is ever sent.** The failure is the provisioning tool's own pre-flight required-permission manifest check; the structured error is returned before any outbound Supabase call. Therefore no Supabase HTTP status/body exists to report, and "No organizations found" cannot be an empty org list over the wire — discovery never ran. | Latest recorded tool response (2026-10-12 retry, deterministic, not re-spammed per instruction): `{"message":"Missing required permission(s): organizations_read","error":{"missing_permissions":["organizations_read"]}}` — a platform-shaped payload, not a Supabase API error envelope. |
+| 3 | Does the token have `organizations_read`; is the org/project scope compatible? | **Cannot be validated from here — and is not the gating factor.** Since the managed tool consumes no user PAT, the PAT scope configured in the user's own Supabase dashboard is irrelevant to *this* path; the `organizations_read` demand comes from the platform's internal permission manifest for the workspace integration. | Item 1 + item 2. The manifest demand is quoted verbatim by the tool itself. |
+| 4 | Is a "Token Connected" UI state shown falsely on failed validation? | **The repository contains no token/connection UI of any kind** — nothing in the VisaBridge codebase can display a connected state, falsely or otherwise. Any "Token Connected" indicator the user has seen belongs to a platform-side or third-party surface outside this repo and outside this workspace's reach. | Content search across `src/` for token/org/connection UI strings: zero matches. The app renders an honest "account services temporarily unavailable" state when env vars are absent (`src/lib/supabase/server.ts` throws; pages degrade gracefully). |
+| 5 | Is the integration using the correct existing org/project instead of requiring a new one? | **It cannot target any org or project at all in its current form.** The provisioning capability exposes no parameter for a project ref or org id (only a free-text reason), so it *must* rely on org-wide discovery — which is exactly what the missing `organizations_read` scope blocks. The existing `international-visa-platform` project can therefore not be bound from here today. | Capability signature: single free-text `reason` argument; no ref/org/scope parameters. No new organization or project was created, and none will be as a workaround. |
+| 6 | Root cause | **Platform-side integration design + workspace permission gap.** The integration is org-discovery-driven and requires the `organizations_read` scope, which this workspace cannot grant; with discovery blocked, it fails pre-flight before touching Supabase. The three historical symptoms the user saw ("No organizations found", "Personal Access Token is not configured", "missing organizations_read") are consistent with this same gating at different stages — none of them originates in, or is repairable from, the VisaBridge repository. | Items 1–5 above. The application side is verified ready: client code reads exactly the four standard variables; 7 ordered migrations (`0001_init` … `0007_page_notices`) plus airport/reference seeds are in place and idempotent. |
+
+**Support escalation message (ready to send to Massvai Support):**
+
+> The database-provisioning capability in my workspace fails its pre-flight permission
+> manifest before any Supabase API call, returning:
+> `{"message":"Missing required permission(s): organizations_read","error":{"missing_permissions":["organizations_read"]}}`.
+> The tool exposes no parameter to bind an existing project by reference, so org discovery
+> (and thus `organizations_read`) is mandatory in its current design — my existing Supabase
+> project "international-visa-platform" cannot be connected, and no user-supplied Personal
+> Access Token is consumed by this path. Requested platform-side fix, either one suffices:
+> (a) grant this workspace's provisioning integration the `organizations_read` scope so
+> discovery can run, or (b) add project-ref-based binding so a workspace can attach to a
+> known Supabase project with least-privilege scopes. Verification of the fix: the four
+> variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+> `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`) appear in my project runtime, after which I
+> will apply my 7 prepared migrations and run end-to-end auth/order tests.
+
+**Next verifiable action:** when either (a) or (b) lands — or the database is connected via
+project settings — success is objectively checkable in seconds: the four variable *names*
+appear in the runtime environment. Migrations 0001–0007, seeds, first-super-admin bootstrap,
+and the live registration/login/order checks then follow mechanically with no code changes.
+
 ## 2. Branding
 
 - Platform name default: **VisaBridge Global**. Tagline: **Your Journey. Our Guidance.**
