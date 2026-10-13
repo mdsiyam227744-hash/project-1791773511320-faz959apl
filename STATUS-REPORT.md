@@ -577,7 +577,8 @@ operational handover: **[Operations Checklists](docs/OPERATIONS-CHECKLISTS.md)**
 ### 15.3 Verification performed before this report
 
 `pnpm exec tsc --noEmit` → **0 errors**; `pnpm test` → **99/99 pass**. The tree is clean at
-`216d2cb8982e271f1cb15ebbe76e6b0acca037bd` with the two new docs committed on top. Nothing in
+`e91a80c` (this documentation pass, on top of the three unpushed commits from the aviation
+pass, the newest being `216d2cb8982e271f1cb15ebbe76e6b0acca037bd`). Nothing in
 this pass changed application behavior — the honest not-connected/not-configured states are the
 correct production behavior until the external owners close §15.1.
 
